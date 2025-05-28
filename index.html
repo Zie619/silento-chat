@@ -269,6 +269,10 @@
                 
                 <div class="input-area">
                     <input type="text" class="input" id="messageInput" placeholder="Type your message..." maxlength="500">
+                    <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display: none;" onchange="handleFileSelect(event)">
+                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                        📁
+                    </button>
                     <button class="btn btn-primary" onclick="sendMessage()">
                         Send
                     </button>

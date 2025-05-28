@@ -788,13 +788,26 @@
                 }
             }
             
-            // Create download link
+            // Create download link and preview for images
             const transferElement = document.getElementById(`transfer_${transferId}`);
             if (transferElement) {
                 const statusElement = transferElement.querySelector('.transfer-status');
                 if (statusElement) {
+                    let previewHtml = '';
+                    
+                    // Add image preview if it's an image file
+                    if (transfer.fileType.startsWith('image/')) {
+                        previewHtml = `
+                            <div style="margin: 8px 0;">
+                                <img src="${completeFile}" alt="${transfer.fileName}" 
+                                     style="max-width: 200px; max-height: 200px; border-radius: 8px; display: block;">
+                            </div>
+                        `;
+                    }
+                    
                     statusElement.innerHTML = `
                         ✅ Complete
+                        ${previewHtml}
                         <a href="${completeFile}" download="${transfer.fileName}" class="download-btn">
                             📥 Download
                         </a>
