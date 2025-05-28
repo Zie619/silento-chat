@@ -421,6 +421,18 @@
                         addMessageToChat('Anonymous', message.message);
                     }
                     break;
+                case 'file-chunk':
+                    // Received file from another user
+                    if (message.clientId !== clientId) {
+                        const fileData = {
+                            fileName: message.fileName,
+                            fileType: message.fileType,
+                            fileSize: message.fileSize,
+                            fileData: message.chunkData
+                        };
+                        addMessageToChat('Anonymous', '', false, true, fileData);
+                    }
+                    break;
                 case 'error':
                     showStatus('Error: ' + message.message, 'error');
                     break;
