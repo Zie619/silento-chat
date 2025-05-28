@@ -1,0 +1,16 @@
+{
+  "name": "Anonymous Chat",
+  "short_name": "AnonChat",
+  "description": "Anonymous peer-to-peer chat with file sharing",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1a1a1a",
+  "background_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
