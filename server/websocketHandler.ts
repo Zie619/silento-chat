@@ -86,13 +86,17 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
             break;
           
           case 'message':
-            handleChatMessage(message, roomManager, currentRoomId);
+            if (currentRoomId && currentClientId) {
+              handleChatMessage(message, roomManager, currentRoomId);
+            }
             break;
             
           case 'file-offer':
           case 'file-chunk':
           case 'file-complete':
-            handleFileMessage(message, roomManager, currentRoomId);
+            if (currentRoomId && currentClientId) {
+              handleFileMessage(message, roomManager, currentRoomId);
+            }
             break;
           
           case 'offer':
