@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { FileTransfer, FileChunk } from '../types';
 
 const CHUNK_SIZE = 16384; // 16KB chunks
