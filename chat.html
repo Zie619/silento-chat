@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Anonymous Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 40px 0;
+        }
+        
+        .btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+        
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+        
+        .room-info {
+            text-align: center;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        
+        .room-code {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #667eea;
+            margin: 16px 0;
+        }
+        
+        .footer {
+            margin-top: auto;
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            padding: 20px 0;
+        }
+        
+        .input {
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 1rem;
+            margin: 10px 0;
+        }
+        
+        .input::placeholder {
+            color: #888;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 60vh;
+        }
+        
+        .messages-area {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            color: #888;
+            padding: 20px 0;
+        }
+        
+        .message {
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 8px;
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 3px solid #667eea;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .input-area .input {
+            flex: 1;
+            margin: 0;
+        }
+        
+        .input-area .btn {
+            margin: 0;
+            padding: 16px 20px;
+        }
+        
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div id="homeScreen">
+            <div class="header">
+                <h1>Anonymous Chat</h1>
+                <p>Ephemeral peer-to-peer messaging</p>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="createRoom()">
+                    Create Room
+                </button>
+                <button class="btn btn-secondary" onclick="showJoinRoom()">
+                    Join Room
+                </button>
+            </div>
+            
+            <div class="footer">
+                <p>No registration required • No data stored • Completely anonymous</p>
+            </div>
+        </div>
+        
+        <div id="createScreen" class="hidden">
+            <div class="header">
+                <h1>Room Created!</h1>
+            </div>
+            
+            <div class="room-info">
+                <p>Share this code with others:</p>
+                <div class="room-code" id="roomCode">------</div>
+                <p>Others can join using this 6-character code</p>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="startChat()">
+                    Start Chatting
+                </button>
+                <button class="btn btn-secondary" onclick="goHome()">
+                    Back to Home
+                </button>
+            </div>
+        </div>
+        
+        <div id="joinScreen" class="hidden">
+            <div class="header">
+                <h1>Join Room</h1>
+                <p>Enter the 6-character room code</p>
+            </div>
+            
+            <div class="actions">
+                <input type="text" class="input" id="roomInput" placeholder="Enter room code" maxlength="6">
+                <button class="btn btn-primary" onclick="joinRoom()">
+                    Join Room
+                </button>
+                <button class="btn btn-secondary" onclick="goHome()">
+                    Back
+                </button>
+            </div>
+        </div>
+
+        <div id="chatScreen" class="hidden">
+            <div class="header">
+                <h1>Chat Room</h1>
+                <p>Room: <span id="currentRoomDisplay">------</span></p>
+            </div>
+            
+            <div class="chat-container">
+                <div id="messages" class="messages-area">
+                    <div class="welcome-message">
+                        <p>Welcome to the anonymous chat!</p>
+                        <p>Start typing to send messages...</p>
+                    </div>
+                </div>
+                
+                <div class="input-area">
+                    <input type="text" class="input" id="messageInput" placeholder="Type your message..." maxlength="500">
+                    <button class="btn btn-primary" onclick="sendMessage()">
+                        Send
+                    </button>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="leaveRoom()">
+                    Leave Room
+                </button>
+            </div>
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let currentRoomId = null;
+        let clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        async function createRoom() {
+            try {
+                showStatus('Creating room...', 'info');
+                
+                const response = await fetch('http://localhost:8000/api/create-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to create room');
+                }
+                
+                const data = await response.json();
+                currentRoomId = data.roomId;
+                
+                document.getElementById('roomCode').textContent = data.roomId;
+                showScreen('createScreen');
+                showStatus('Room created successfully!', 'success');
+                
+            } catch (error) {
+                showStatus('Error creating room: ' + error.message, 'error');
+            }
+        }
+
+        async function joinRoom() {
+            const roomId = document.getElementById('roomInput').value.toUpperCase();
+            
+            if (!roomId || roomId.length !== 6) {
+                showStatus('Please enter a valid 6-character room code', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Checking room...', 'info');
+                
+                const statusResponse = await fetch(`http://localhost:8000/api/room/${roomId}/status`);
+                
+                if (!statusResponse.ok) {
+                    showStatus('Room not found or has expired', 'error');
+                    return;
+                }
+                
+                const roomStatus = await statusResponse.json();
+                
+                const response = await fetch('http://localhost:8000/api/join-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId, clientId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to join room');
+                }
+                
+                currentRoomId = roomId;
+                showStatus(`Joining room with ${roomStatus.peerCount} peer(s)...`, 'success');
+                startChat();
+                
+            } catch (error) {
+                showStatus('Error joining room: ' + error.message, 'error');
+            }
+        }
+
+        function startChat() {
+            if (currentRoomId) {
+                connectToRoom(currentRoomId);
+                showChatInterface();
+            }
+        }
+
+        function connectToRoom(roomId) {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//localhost:8000/ws`;
+            
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                ws.send(JSON.stringify({
+                    type: 'init',
+                    roomId: roomId,
+                    clientId: clientId
+                }));
+                showStatus('Connected to room: ' + roomId, 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+            
+            ws.onerror = (error) => {
+                console.log('WebSocket error:', error);
+                showStatus('Connection error. Please try again.', 'error');
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                showStatus('Disconnected from room', 'error');
+            };
+            
+            window.currentWebSocket = ws;
+        }
+
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'init-success':
+                    showStatus(`Connected! ${message.peers ? message.peers.length : 0} other(s) in room`, 'success');
+                    break;
+                case 'peer-joined':
+                    showStatus(`Someone joined the room!`, 'success');
+                    addMessageToChat('System', 'A new person joined the chat');
+                    break;
+                case 'peer-left':
+                    showStatus(`Someone left the room`, 'info');
+                    addMessageToChat('System', 'Someone left the chat');
+                    break;
+                case 'message':
+                    if (message.clientId !== clientId) {
+                        addMessageToChat('Anonymous', message.message);
+                    }
+                    break;
+                case 'error':
+                    showStatus('Error: ' + message.message, 'error');
+                    break;
+            }
+        }
+
+        function showChatInterface() {
+            document.getElementById('currentRoomDisplay').textContent = currentRoomId;
+            showScreen('chatScreen');
+            document.getElementById('messageInput').focus();
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const messageText = messageInput.value.trim();
+            
+            if (!messageText) return;
+            
+            if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                window.currentWebSocket.send(JSON.stringify({
+                    type: 'message',
+                    roomId: currentRoomId,
+                    clientId: clientId,
+                    message: messageText,
+                    timestamp: Date.now()
+                }));
+                
+                addMessageToChat('You', messageText, true);
+                messageInput.value = '';
+            } else {
+                showStatus('Not connected to room. Please try reconnecting.', 'error');
+            }
+        }
+
+        function addMessageToChat(sender, message, isOwnMessage = false) {
+            const messagesArea = document.getElementById('messages');
+            const welcomeMessage = messagesArea.querySelector('.welcome-message');
+            
+            if (welcomeMessage && sender !== 'System') {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <strong>${sender}:</strong> ${message}
+                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
+                    ${new Date().toLocaleTimeString()}
+                </div>
+            `;
+            
+            if (isOwnMessage) {
+                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+                messageDiv.style.borderLeftColor = '#22c55e';
+            }
+            
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function leaveRoom() {
+            if (window.currentWebSocket) {
+                window.currentWebSocket.close();
+                window.currentWebSocket = null;
+            }
+            currentRoomId = null;
+            goHome();
+        }
+
+        function showJoinRoom() {
+            showScreen('joinScreen');
+            document.getElementById('roomInput').focus();
+        }
+
+        function goHome() {
+            showScreen('homeScreen');
+            currentRoomId = null;
+            clearStatus();
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.app > div').forEach(div => {
+                if (div.id && div.id.endsWith('Screen')) {
+                    div.classList.add('hidden');
+                }
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function clearStatus() {
+            document.getElementById('status').innerHTML = '';
+        }
+
+        document.getElementById('roomInput').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        document.getElementById('roomInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                joinRoom();
+            }
+        });
+    </script>
+</body>
+</html>
