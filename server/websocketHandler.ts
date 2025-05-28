@@ -8,6 +8,35 @@ interface WebSocketMessage {
   from?: string;
   to?: string;
   payload?: any;
+  message?: string;
+  timestamp?: number;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  fileData?: string;
+}
+
+function handleChatMessage(message: WebSocketMessage, roomManager: RoomManager, currentRoomId: string) {
+  if (!message.roomId || !message.clientId || !currentRoomId) {
+    return;
+  }
+
+  // Broadcast message to all clients in the room
+  roomManager.broadcastToRoom(currentRoomId, {
+    type: 'message',
+    clientId: message.clientId,
+    message: message.message,
+    timestamp: message.timestamp || Date.now()
+  });
+}
+
+function handleFileMessage(message: WebSocketMessage, roomManager: RoomManager, currentRoomId: string) {
+  if (!message.roomId || !message.clientId || !currentRoomId) {
+    return;
+  }
+
+  // Broadcast file message to all clients in the room except sender
+  roomManager.broadcastToRoom(currentRoomId, message, message.clientId);
 }
 
 export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomManager) {
@@ -56,6 +85,16 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
             handleInit(message, ws, roomManager);
             break;
           
+          case 'message':
+            handleChatMessage(message, roomManager, currentRoomId);
+            break;
+            
+          case 'file-offer':
+          case 'file-chunk':
+          case 'file-complete':
+            handleFileMessage(message, roomManager, currentRoomId);
+            break;
+          
           case 'offer':
           case 'answer':
           case 'ice-candidate':
@@ -65,7 +104,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
           default:
             ws.send(JSON.stringify({ 
               type: 'error', 
-              message: 'Unknown message type' 
+              message: 'Unknown message type: ' + message.type 
             }));
         }
 
@@ -145,6 +184,8 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
 
       console.log(`Client ${clientId} joined room ${roomId}`);
     }
+
+
 
     function handleSignaling(message: WebSocketMessage, roomManager: RoomManager) {
       const { from, to, payload, type } = message;
