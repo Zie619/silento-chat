@@ -270,7 +270,7 @@ export function useFileTransfer(sendMessage: (type: string, data: any, targetPee
   }, [activeTransfers, updateTransfer, removeTransfer, calculateSpeed]);
 
   // Listen for incoming file messages
-  React.useEffect(() => {
+  useEffect(() => {
     const handleWebRTCMessage = (event: CustomEvent) => {
       const { type, data } = event.detail;
       

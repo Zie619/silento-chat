@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5000,
     host: '0.0.0.0',
     strictPort: true,
+    allowedHosts: ['fd45fcd6-77b7-42f9-860c-00e1fd8677a0-00-1nkggw0kj4hph.spock.replit.dev'],
     hmr: {
       port: 5000,
       host: '0.0.0.0'
