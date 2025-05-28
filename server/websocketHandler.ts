@@ -10,10 +10,14 @@ interface WebSocketMessage {
   payload?: any;
   message?: string;
   timestamp?: number;
+  transferId?: string;
   fileName?: string;
   fileType?: string;
   fileSize?: number;
   fileData?: string;
+  chunkIndex?: number;
+  totalChunks?: number;
+  chunkData?: string;
 }
 
 function handleChatMessage(message: WebSocketMessage, roomManager: RoomManager, currentRoomId: string) {

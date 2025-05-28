@@ -186,6 +186,60 @@
             padding: 16px 20px;
         }
         
+        .file-transfer {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            border-left: 3px solid #f59e0b;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .file-icon {
+            font-size: 1.2em;
+        }
+        
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        .file-size {
+            font-size: 0.8em;
+            color: #888;
+        }
+        
+        .download-btn {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        
+        .download-btn:hover {
+            background: rgba(102, 126, 234, 0.3);
+        }
+        
         .hidden { display: none; }
     </style>
 </head>
@@ -412,17 +466,9 @@
                         addMessageToChat('Anonymous', message.message);
                     }
                     break;
-                case 'file-offer':
                 case 'file-chunk':
-                case 'file-complete':
                     if (message.clientId !== clientId) {
-                        const fileData = {
-                            fileName: message.fileName,
-                            fileType: message.fileType,
-                            fileSize: message.fileSize,
-                            fileData: message.fileData
-                        };
-                        addMessageToChat('Anonymous', '', false, true, fileData);
+                        handleIncomingFileChunk(message);
                     }
                     break;
                 case 'error':
@@ -507,48 +553,253 @@
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
 
+        const fileTransfers = new Map();
+        const CHUNK_SIZE = 32 * 1024; // 32KB chunks
+        const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB limit
+
+        function getFileIcon(fileType, fileName) {
+            if (fileType.startsWith('image/')) return '🖼️';
+            if (fileType.startsWith('video/')) return '🎥';
+            if (fileType.startsWith('audio/')) return '🎵';
+            if (fileType.includes('pdf')) return '📄';
+            if (fileType.includes('word') || fileName.endsWith('.doc') || fileName.endsWith('.docx')) return '📝';
+            if (fileName.endsWith('.txt')) return '📄';
+            if (fileType.includes('zip') || fileName.endsWith('.zip') || fileName.endsWith('.rar') || fileName.endsWith('.7z')) return '📦';
+            return '📁';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Check file size (limit to 10MB)
-            if (file.size > 10 * 1024 * 1024) {
-                showStatus('File too large. Maximum size is 10MB.', 'error');
+            // Check file size (limit to 100MB)
+            if (file.size > MAX_FILE_SIZE) {
+                showStatus(`File too large. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`, 'error');
                 return;
             }
 
             // Check file type
-            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-                showStatus('Only image and video files are supported.', 'error');
+            const allowedTypes = [
+                'image/', 'video/', 'audio/', 
+                'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'text/plain', 'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'
+            ];
+            
+            const isAllowed = allowedTypes.some(type => 
+                file.type.startsWith(type) || 
+                file.name.toLowerCase().endsWith('.txt') ||
+                file.name.toLowerCase().endsWith('.doc') ||
+                file.name.toLowerCase().endsWith('.docx') ||
+                file.name.toLowerCase().endsWith('.zip') ||
+                file.name.toLowerCase().endsWith('.rar') ||
+                file.name.toLowerCase().endsWith('.7z')
+            );
+
+            if (!isAllowed) {
+                showStatus('File type not supported. Supported: images, videos, audio, PDF, DOC, TXT, ZIP files.', 'error');
                 return;
             }
 
+            // Start file transfer
+            startFileTransfer(file);
+        }
+
+        function startFileTransfer(file) {
+            const transferId = 'transfer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            
+            const transfer = {
+                id: transferId,
+                file: file,
+                fileName: file.name,
+                fileType: file.type || 'application/octet-stream',
+                fileSize: file.size,
+                totalChunks: totalChunks,
+                currentChunk: 0,
+                chunks: [],
+                progress: 0,
+                status: 'preparing'
+            };
+
+            fileTransfers.set(transferId, transfer);
+
+            // Add transfer UI to chat
+            addFileTransferToChat(transfer, true);
+
+            // Start sending chunks
+            sendNextChunk(transferId);
+        }
+
+        function sendNextChunk(transferId) {
+            const transfer = fileTransfers.get(transferId);
+            if (!transfer || transfer.status === 'completed' || transfer.status === 'error') return;
+
+            const start = transfer.currentChunk * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, transfer.file.size);
+            const chunk = transfer.file.slice(start, end);
+
             const reader = new FileReader();
             reader.onload = function(e) {
-                const fileData = {
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileSize: file.size,
-                    fileData: e.target.result
-                };
-
                 if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                    // Send file via WebSocket
                     window.currentWebSocket.send(JSON.stringify({
-                        type: 'file-offer',
+                        type: 'file-chunk',
                         roomId: currentRoomId,
                         clientId: clientId,
-                        ...fileData,
+                        transferId: transferId,
+                        fileName: transfer.fileName,
+                        fileType: transfer.fileType,
+                        fileSize: transfer.fileSize,
+                        chunkIndex: transfer.currentChunk,
+                        totalChunks: transfer.totalChunks,
+                        chunkData: e.target.result,
                         timestamp: Date.now()
                     }));
 
-                    // Add file to local chat
-                    addMessageToChat('You', '', true, true, fileData);
+                    // Update progress
+                    transfer.currentChunk++;
+                    transfer.progress = (transfer.currentChunk / transfer.totalChunks) * 100;
+                    updateFileTransferProgress(transferId, transfer.progress);
+
+                    if (transfer.currentChunk < transfer.totalChunks) {
+                        // Send next chunk
+                        setTimeout(() => sendNextChunk(transferId), 10);
+                    } else {
+                        // Transfer complete
+                        transfer.status = 'completed';
+                        markFileTransferComplete(transferId);
+                    }
                 } else {
-                    showStatus('Not connected to room. Please try reconnecting.', 'error');
+                    transfer.status = 'error';
+                    showStatus('Connection lost during file transfer.', 'error');
                 }
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(chunk);
+        }
+
+        function addFileTransferToChat(transfer, isOutgoing) {
+            const messagesArea = document.getElementById('messagesArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isOutgoing ? 'own' : 'other'}`;
+            messageDiv.id = `transfer_${transfer.id}`;
+            
+            const icon = getFileIcon(transfer.fileType, transfer.fileName);
+            
+            messageDiv.innerHTML = `
+                <div class="file-transfer">
+                    <div class="file-info">
+                        <span class="file-icon">${icon}</span>
+                        <strong>${transfer.fileName}</strong>
+                        <span class="file-size">(${formatFileSize(transfer.fileSize)})</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="transfer-status">${isOutgoing ? 'Sending...' : 'Receiving...'}</div>
+                </div>
+            `;
+            
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function updateFileTransferProgress(transferId, progress) {
+            const transferElement = document.getElementById(`transfer_${transferId}`);
+            if (transferElement) {
+                const progressFill = transferElement.querySelector('.progress-fill');
+                const statusElement = transferElement.querySelector('.transfer-status');
+                
+                if (progressFill) {
+                    progressFill.style.width = `${progress}%`;
+                }
+                
+                if (statusElement) {
+                    statusElement.textContent = `${Math.round(progress)}%`;
+                }
+            }
+        }
+
+        function markFileTransferComplete(transferId) {
+            const transferElement = document.getElementById(`transfer_${transferId}`);
+            if (transferElement) {
+                const statusElement = transferElement.querySelector('.transfer-status');
+                if (statusElement) {
+                    statusElement.innerHTML = '✅ Complete';
+                }
+            }
+        }
+
+        const incomingTransfers = new Map();
+
+        function handleIncomingFileChunk(message) {
+            const transferId = message.transferId;
+            
+            if (!incomingTransfers.has(transferId)) {
+                // First chunk - initialize transfer
+                const transfer = {
+                    id: transferId,
+                    fileName: message.fileName,
+                    fileType: message.fileType,
+                    fileSize: message.fileSize,
+                    totalChunks: message.totalChunks,
+                    receivedChunks: new Map(),
+                    progress: 0
+                };
+                
+                incomingTransfers.set(transferId, transfer);
+                addFileTransferToChat(transfer, false);
+            }
+            
+            const transfer = incomingTransfers.get(transferId);
+            transfer.receivedChunks.set(message.chunkIndex, message.chunkData);
+            
+            // Update progress
+            transfer.progress = (transfer.receivedChunks.size / transfer.totalChunks) * 100;
+            updateFileTransferProgress(transferId, transfer.progress);
+            
+            // Check if all chunks received
+            if (transfer.receivedChunks.size === transfer.totalChunks) {
+                reassembleFile(transferId);
+            }
+        }
+
+        function reassembleFile(transferId) {
+            const transfer = incomingTransfers.get(transferId);
+            if (!transfer) return;
+            
+            let completeFile = '';
+            for (let i = 0; i < transfer.totalChunks; i++) {
+                const chunkData = transfer.receivedChunks.get(i);
+                if (chunkData) {
+                    // Remove data URL prefix for all but first chunk
+                    const data = i === 0 ? chunkData : chunkData.split(',')[1];
+                    completeFile += data;
+                }
+            }
+            
+            // Create download link
+            const transferElement = document.getElementById(`transfer_${transferId}`);
+            if (transferElement) {
+                const statusElement = transferElement.querySelector('.transfer-status');
+                if (statusElement) {
+                    statusElement.innerHTML = `
+                        ✅ Complete
+                        <a href="${completeFile}" download="${transfer.fileName}" class="download-btn">
+                            📥 Download
+                        </a>
+                    `;
+                }
+            }
+            
+            markFileTransferComplete(transferId);
+            incomingTransfers.delete(transferId);
         }
 
         function leaveRoom() {
