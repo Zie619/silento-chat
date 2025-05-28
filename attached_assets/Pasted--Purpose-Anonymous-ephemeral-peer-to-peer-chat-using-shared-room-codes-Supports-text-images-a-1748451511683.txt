@@ -1,0 +1,140 @@
+🎯 Purpose: Anonymous, ephemeral peer-to-peer chat using shared room codes. Supports text, images, and video file sharing with no user accounts or backend storage.
+
+🧠 BACKEND (Coordination + Signaling Layer)
+Build a lightweight, stateless backend that only handles room creation, peer discovery, and signaling for P2P connections. No user data, no media storage.
+
+🧱 Backend Responsibilities:
+REST API for creating/joining rooms
+
+WebSocket-based signaling relay (for offer/answer/ICE)
+
+In-memory room state (no DB)
+
+Expire empty/inactive rooms (after 5 minutes)
+
+No media routing or persistence — strictly signaling layer
+
+🔧 REST API
+POST /create-room
+Response: { roomId: string }
+
+Creates short room ID, initializes memory state
+
+POST /join-room
+Body: { roomId: string, clientId: string }
+
+Response: { peers: string[] }
+
+Adds client to room, returns peer list
+
+🔁 WebSocket Protocol
+On connection: { type: "init", roomId, clientId }
+
+Relay signaling messages:
+
+{ type: "offer" | "answer" | "ice-candidate", from, to, payload }
+
+Notify others on disconnect:
+
+{ type: "peer-left", clientId }
+
+🔐 Security & Hygiene
+Validate message formats
+
+Sanitize input
+
+Rate-limit WS traffic
+
+No user tracking, no cookies, no logging
+
+⚠️ Optional:
+
+If P2P fails due to network restrictions, optionally support temporary in-memory message relay with auto-expiry (e.g., 60s buffer max)
+
+📱 FRONTEND (iOS App) — Anonymous P2P Chat with File & Video Sharing
+Build a Swift-based iOS app that allows users to connect via room ID and communicate directly P2P using WebRTC or MultipeerConnectivity.
+
+No backend chat storage. No profiles. No auth. Everything is ephemeral.
+
+🧭 User Flow
+Create Room → calls /create-room → receives roomId
+
+Join Room → enters roomId → connects to WebSocket + peers
+
+App creates a mesh of peer connections and opens DataChannels
+
+💬 Supported Communication
+Once connected, users can exchange:
+
+✅ Text Messages
+
+🖼️ Images (base64 or binary chunks)
+
+🎞️ Pre-recorded video files (e.g., MP4, MOV)
+
+🔄 Video File Sending:
+📦 Use WebRTC DataChannel or MultipeerConnectivity to transfer full video files peer-to-peer:
+
+WebRTC DataChannel Approach:
+Select a video (from Files or Photos)
+
+Chunk into 16–32KB segments
+
+Send each chunk over DataChannel
+
+Reassemble and write on receiving side
+
+Example (Swift pseudocode):
+
+swift
+Copy
+Edit
+let chunkSize = 16000
+let fileData = try Data(contentsOf: fileURL)
+for offset in stride(from: 0, to: fileData.count, by: chunkSize) {
+    let chunk = fileData.subdata(in: offset..<min(offset + chunkSize, fileData.count))
+    dataChannel.sendData(RTCDataBuffer(data: chunk, isBinary: true))
+}
+MultipeerConnectivity (for local P2P):
+Use Apple's native APIs to send files in full
+
+Less control, but simpler for LAN/nearby devices
+
+🎨 UI Requirements
+Minimalist, modern dark-mode interface
+
+Components:
+
+Create/join room screens
+
+Chat view (text/images/videos)
+
+File picker & preview
+
+Peer list / connection status
+
+Show when a peer joins or leaves
+
+Progress bar for file/video transfer
+
+Warning: leaving app = session lost
+
+📲 Performance & UX Considerations
+Feature	Requirement
+Live chat	Low-latency via DataChannel
+File/image	Handle chunks, show preview
+Video	Chunked P2P transfer, preview on receiver
+Error handling	Show reconnect prompts
+Storage	RAM only — no disk persistence
+Encryption	WebRTC/MPC secure by default
+
+🧪 QA Checklist
+Test file + video transfer across devices
+
+Confirm correct reassembly and preview
+
+Stress test multiple peers
+
+Confirm room expiry logic
+
+Gracefully handle disconnects and backgrounding
