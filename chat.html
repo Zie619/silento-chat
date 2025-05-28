@@ -379,7 +379,7 @@
             try {
                 showStatus('Checking room...', 'info');
                 
-                const statusResponse = await fetch(`http://localhost:8000/api/room/${roomId}/status`);
+                const statusResponse = await fetch(`/api/room/${roomId}/status`);
                 
                 if (!statusResponse.ok) {
                     showStatus('Room not found or has expired', 'error');
@@ -388,7 +388,7 @@
                 
                 const roomStatus = await statusResponse.json();
                 
-                const response = await fetch('http://localhost:8000/api/join-room', {
+                const response = await fetch('/api/join-room', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ roomId, clientId })
@@ -685,7 +685,11 @@
         }
 
         function addFileTransferToChat(transfer, isOutgoing) {
-            const messagesArea = document.getElementById('messagesArea');
+            const messagesArea = document.getElementById('messages');
+            if (!messagesArea) {
+                console.error('Messages area not found');
+                return;
+            }
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isOutgoing ? 'own' : 'other'}`;
             messageDiv.id = `transfer_${transfer.id}`;
