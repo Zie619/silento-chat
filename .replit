@@ -34,8 +34,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx vite --port 8080 --host 0.0.0.0"
-waitForPort = 8080
+args = "sudo npx vite --port 80 --host 0.0.0.0"
+waitForPort = 80
 
 [deployment]
 run = ["sh", "-c", "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"]
