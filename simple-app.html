@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Anonymous Chat</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -41,7 +37,6 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
         
         .header p {
@@ -270,7 +265,9 @@
 
         function startChat() {
             if (currentRoomId) {
-                showStatus('Chat ready in room: ' + currentRoomId + ' - WebSocket connection will now establish for peer-to-peer messaging!', 'success');
+                showStatus('Starting chat in room: ' + currentRoomId + ' (WebSocket connection will establish)', 'success');
+                // Here you would normally navigate to the chat interface
+                // For now, just show the success message
             }
         }
 
@@ -308,35 +305,5 @@
             e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
         });
     </script>
-    
-    <!-- PWA registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
-      }
-    </script>
-    
-    <!-- iOS viewport fix -->
-    <script>
-      // Fix iOS viewport height issue
-      function setViewportHeight() {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-      }
-      
-      setViewportHeight();
-      window.addEventListener('resize', setViewportHeight);
-      window.addEventListener('orientationchange', () => {
-        setTimeout(setViewportHeight, 100);
-      });
-    </script>
-  </body>
+</body>
 </html>

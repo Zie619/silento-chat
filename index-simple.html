@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anonymous Chat</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: white; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 400px; 
+            margin: 50px auto; 
+            text-align: center; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 15px 30px; 
+            margin: 10px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px; 
+        }
+        button:hover { background: #0056b3; }
+        #status { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Anonymous Chat</h1>
+        <p>Peer-to-peer anonymous chat with file sharing</p>
+        
+        <button onclick="createRoom()">Create Room</button>
+        <button onclick="joinRoom()">Join Room</button>
+        
+        <div id="status"></div>
+        <div id="roomInfo" style="display:none;">
+            <h3>Room Code: <span id="roomCode"></span></h3>
+            <p>Share this code with others to join your chat</p>
+        </div>
+    </div>
+
+    <script>
+        async function createRoom() {
+            try {
+                const response = await fetch('http://localhost:8000/api/create-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                document.getElementById('roomCode').textContent = data.roomId;
+                document.getElementById('roomInfo').style.display = 'block';
+                document.getElementById('status').innerHTML = `<p style="color: green;">Room created successfully!</p>`;
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<p style="color: red;">Error creating room: ${error.message}</p>`;
+            }
+        }
+
+        function joinRoom() {
+            const roomId = prompt('Enter room code:');
+            if (roomId) {
+                document.getElementById('status').innerHTML = `<p style="color: green;">Attempting to join room: ${roomId}</p>`;
+                // Add join room logic here
+            }
+        }
+    </script>
+</body>
+</html>
