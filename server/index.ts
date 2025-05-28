@@ -40,9 +40,9 @@ app.use((req: any, res: any, next: any) => {
 // Setup routes and WebSocket
 setupRoutes(app, server);
 
-const PORT = process.env.PORT || 8000;
+const PORT = parseInt(process.env.PORT || '8000', 10);
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 

@@ -18,7 +18,7 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     }
   });
 
-  app.post('/api/join-room', (req, res) => {
+  app.post('/api/join-room', (req: any, res: any) => {
     try {
       const { roomId, clientId } = req.body;
       
@@ -43,7 +43,7 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     }
   });
 
-  app.get('/api/room/:roomId/status', (req, res) => {
+  app.get('/api/room/:roomId/status', (req: any, res: any) => {
     try {
       const { roomId } = req.params;
       const room = roomManager.getRoom(roomId);

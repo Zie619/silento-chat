@@ -19,14 +19,18 @@ args = "Server"
 task = "workflow.run"
 args = "Backend"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Frontend"
+
 [[workflows.workflow]]
 name = "Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm install && npm run build && npm start"
-waitForPort = 5000
+args = "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"
+waitForPort = 8000
 
 [[workflows.workflow]]
 name = "Backend"
@@ -37,5 +41,22 @@ task = "shell.exec"
 args = "cd server && node --loader ts-node/esm index.ts"
 waitForPort = 8000
 
+[[workflows.workflow]]
+name = "Frontend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx vite --port 5000 --host 0.0.0.0"
+waitForPort = 5000
+
 [deployment]
-run = ["sh", "-c", "npm install && npm run build && npm start"]
+run = ["sh", "-c", "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"]
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
+localPort = 8000
+externalPort = 80
