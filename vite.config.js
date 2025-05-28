@@ -6,10 +6,16 @@ export default defineConfig({
   server: {
     port: 5000,
     host: '0.0.0.0',
+    strictPort: true,
+    hmr: {
+      port: 5000,
+      host: '0.0.0.0'
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false
       },
       '/ws': {
         target: 'ws://localhost:8000',
@@ -20,5 +26,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist'
+  },
+  define: {
+    global: 'globalThis'
   }
 })
