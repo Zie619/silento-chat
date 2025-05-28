@@ -26,7 +26,7 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"
-waitForPort = 5000
+waitForPort = 8000
 
 [[workflows.workflow]]
 name = "Frontend"
@@ -34,8 +34,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx vite --port 8080 --host 0.0.0.0"
-waitForPort = 8080
+args = "npx vite --port 5000 --host 0.0.0.0"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"]

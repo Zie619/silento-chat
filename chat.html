@@ -347,7 +347,7 @@
             try {
                 showStatus('Creating room...', 'info');
                 
-                const response = await fetch('http://localhost:5000/api/create-room', {
+                const response = await fetch('/api/create-room', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -379,7 +379,7 @@
             try {
                 showStatus('Checking room...', 'info');
                 
-                const statusResponse = await fetch(`http://localhost:5000/api/room/${roomId}/status`);
+                const statusResponse = await fetch(`http://localhost:8000/api/room/${roomId}/status`);
                 
                 if (!statusResponse.ok) {
                     showStatus('Room not found or has expired', 'error');
@@ -388,7 +388,7 @@
                 
                 const roomStatus = await statusResponse.json();
                 
-                const response = await fetch('http://localhost:5000/api/join-room', {
+                const response = await fetch('http://localhost:8000/api/join-room', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ roomId, clientId })
@@ -416,7 +416,7 @@
 
         function connectToRoom(roomId) {
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const wsUrl = `${protocol}//${window.location.hostname}:5000/ws`;
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
             
             const ws = new WebSocket(wsUrl);
             
