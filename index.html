@@ -457,7 +457,7 @@
             }
         }
 
-        function addMessageToChat(sender, message, isOwnMessage = false) {
+        function addMessageToChat(sender, message, isOwnMessage = false, isFile = false, fileData = null) {
             const messagesArea = document.getElementById('messages');
             const welcomeMessage = messagesArea.querySelector('.welcome-message');
             
@@ -468,8 +468,37 @@
             
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message';
+            
+            let content;
+            if (isFile && fileData) {
+                if (fileData.fileType.startsWith('image/')) {
+                    content = `
+                        <strong>${sender} shared an image:</strong><br>
+                        <img src="${fileData.fileData}" alt="${fileData.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else if (fileData.fileType.startsWith('video/')) {
+                    content = `
+                        <strong>${sender} shared a video:</strong><br>
+                        <video controls style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
+                            <source src="${fileData.fileData}" type="${fileData.fileType}">
+                        </video>
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else {
+                    content = `
+                        <strong>${sender} shared a file:</strong><br>
+                        <a href="${fileData.fileData}" download="${fileData.fileName}" style="color: #667eea; text-decoration: none;">
+                            📎 ${fileData.fileName}
+                        </a>
+                    `;
+                }
+            } else {
+                content = `<strong>${sender}:</strong> ${message}`;
+            }
+            
             messageDiv.innerHTML = `
-                <strong>${sender}:</strong> ${message}
+                ${content}
                 <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
                     ${new Date().toLocaleTimeString()}
                 </div>
@@ -482,6 +511,47 @@
             
             messagesArea.appendChild(messageDiv);
             messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Check file size (limit to 10MB for demo)
+            if (file.size > 10 * 1024 * 1024) {
+                showStatus('File too large. Maximum size is 10MB.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    fileData: e.target.result
+                };
+
+                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                    // Send file via WebSocket
+                    window.currentWebSocket.send(JSON.stringify({
+                        type: 'file-chunk',
+                        roomId: currentRoomId,
+                        clientId: clientId,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        chunkData: e.target.result,
+                        timestamp: Date.now()
+                    }));
+
+                    // Add file to local chat
+                    addMessageToChat('You', '', true, true, fileData);
+                } else {
+                    showStatus('Not connected to room. Please try reconnecting.', 'error');
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         function leaveRoom() {
