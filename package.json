@@ -1,14 +1,22 @@
 {
-  "name": "workspace",
+  "name": "anonymous-chat-app",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts",
+    "client": "vite",
+    "build": "vite build",
+    "build:server": "cd server && tsc",
+    "start": "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts",
+    "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["anonymous", "chat", "p2p", "websocket"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Anonymous peer-to-peer chat application",
   "dependencies": {
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
@@ -26,5 +34,8 @@
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "ws": "^8.18.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

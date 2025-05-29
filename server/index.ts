@@ -6,13 +6,38 @@ import { setupRoutes } from './routes.js';
 const app = express();
 const server = http.createServer(app);
 
+// Environment configuration
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const PORT = parseInt(process.env.PORT || '5001', 10);
+
+// CORS configuration for production
+const corsOptions = {
+  origin: isDevelopment 
+    ? ['http://localhost:3000', 'http://127.0.0.1:3000']
+    : [
+        'https://your-frontend-domain.com', // Replace with your actual frontend domain
+        /^https:\/\/.*\.railway\.app$/, // Allow Railway preview deployments
+        /^https:\/\/.*\.vercel\.app$/, // Allow Vercel deployments
+        /^https:\/\/.*\.netlify\.app$/, // Allow Netlify deployments
+      ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // Rate limiting middleware
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
@@ -40,10 +65,10 @@ app.use((req: any, res: any, next: any) => {
 // Setup routes and WebSocket
 setupRoutes(app, server);
 
-const PORT = parseInt(process.env.PORT || '5000', 10);
-
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
 });
 
 // Cleanup interval for rate limiting
@@ -55,3 +80,18 @@ setInterval(() => {
     }
   }
 }, 60000);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
