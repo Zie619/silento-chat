@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import AVFoundation
 
 class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
@@ -277,7 +278,113 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
     // Handle camera and microphone permissions
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-        decisionHandler(.grant)
+        
+        print("ViewController: Media permission requested for type: \(type.rawValue)")
+        
+        // Request iOS system permissions first
+        switch type {
+        case .camera:
+            requestCameraPermission { granted in
+                DispatchQueue.main.async {
+                    decisionHandler(granted ? .grant : .deny)
+                }
+            }
+        case .microphone:
+            requestMicrophonePermission { granted in
+                DispatchQueue.main.async {
+                    decisionHandler(granted ? .grant : .deny)
+                }
+            }
+        case .cameraAndMicrophone:
+            requestCameraAndMicrophonePermission { granted in
+                DispatchQueue.main.async {
+                    decisionHandler(granted ? .grant : .deny)
+                }
+            }
+        @unknown default:
+            decisionHandler(.deny)
+        }
+    }
+    
+    private func requestCameraPermission(completion: @escaping (Bool) -> Void) {
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        print("ViewController: Current camera permission status: \(currentStatus.rawValue)")
+        
+        switch currentStatus {
+        case .authorized:
+            print("ViewController: Camera already authorized")
+            completion(true)
+        case .notDetermined:
+            print("ViewController: Requesting camera permission...")
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                print("ViewController: Camera permission result: \(granted)")
+                completion(granted)
+            }
+        case .denied, .restricted:
+            print("ViewController: Camera permission denied/restricted, showing settings alert")
+            showPermissionAlert(for: "Camera") { _ in
+                completion(false)
+            }
+        @unknown default:
+            print("ViewController: Unknown camera permission status")
+            completion(false)
+        }
+    }
+    
+    private func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        print("ViewController: Current microphone permission status: \(currentStatus.rawValue)")
+        
+        switch currentStatus {
+        case .authorized:
+            print("ViewController: Microphone already authorized")
+            completion(true)
+        case .notDetermined:
+            print("ViewController: Requesting microphone permission...")
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                print("ViewController: Microphone permission result: \(granted)")
+                completion(granted)
+            }
+        case .denied, .restricted:
+            print("ViewController: Microphone permission denied/restricted, showing settings alert")
+            showPermissionAlert(for: "Microphone") { _ in
+                completion(false)
+            }
+        @unknown default:
+            print("ViewController: Unknown microphone permission status")
+            completion(false)
+        }
+    }
+    
+    private func requestCameraAndMicrophonePermission(completion: @escaping (Bool) -> Void) {
+        requestCameraPermission { cameraGranted in
+            if cameraGranted {
+                self.requestMicrophonePermission { micGranted in
+                    completion(micGranted)
+                }
+            } else {
+                completion(false)
+            }
+        }
+    }
+    
+    private func showPermissionAlert(for mediaType: String, completion: @escaping (UIAlertAction) -> Void) {
+        let alert = UIAlertController(
+            title: "\(mediaType) Access Required",
+            message: "Silento needs access to your \(mediaType.lowercased()) to take photos and videos. Please enable access in Settings.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Settings", style: .default) { _ in
+            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsUrl)
+            }
+            completion(UIAlertAction(title: "Settings", style: .default, handler: nil))
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: completion))
+        
+        present(alert, animated: true)
     }
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
