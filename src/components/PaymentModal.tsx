@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePublicKey = import.meta.env?.VITE_STRIPE_PUBLIC_KEY;
+const stripePublicKey = (import.meta as any).env?.VITE_STRIPE_PUBLIC_KEY;
 
 if (!stripePublicKey) {
   console.warn('Missing Stripe public key - payment functionality disabled');
 }
 
-const stripePromise = loadStripe(stripePublicKey);
+const stripePromise = stripePublicKey ? loadStripe(stripePublicKey) : null;
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -152,10 +152,17 @@ function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {
           </div>
         )}
         
-        {clientSecret && !loading && !error && (
+        {clientSecret && !loading && !error && stripePromise && (
           <Elements stripe={stripePromise} options={{ clientSecret }}>
             <PaymentForm onClose={onClose} onSuccess={onSuccess} />
           </Elements>
+        )}
+        
+        {!stripePromise && (
+          <div className="error-state">
+            <p>Payment system is not configured. Please contact support.</p>
+            <button onClick={onClose} className="btn-primary">Close</button>
+          </div>
         )}
       </div>
     </div>
