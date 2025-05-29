@@ -8,9 +8,7 @@ import { setupWebSocketHandler } from './websocketHandler.js';
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const roomManager = new RoomManager();
 
@@ -69,6 +67,30 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     } catch (error) {
       console.error('Error getting room status:', error);
       res.status(500).json({ error: 'Failed to get room status' });
+    }
+  });
+
+  // Stripe payment endpoint for $5 lifetime subscription
+  app.post('/api/create-payment-intent', async (req, res) => {
+    try {
+      const { amount } = req.body;
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+        metadata: {
+          type: 'silento_pro_subscription'
+        }
+      });
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret 
+      });
+    } catch (error: any) {
+      console.error('Error creating payment intent:', error);
+      res.status(500).json({ 
+        error: 'Failed to create payment intent: ' + error.message 
+      });
     }
   });
 
