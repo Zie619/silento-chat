@@ -215,3 +215,284 @@ body {
   background-color: hsl(var(--surface-hover));
   border-color: hsl(var(--border-light));
 }
+
+/* Remove Ads Button */
+.remove-ads-button {
+  position: fixed;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  z-index: 1000;
+  background-color: hsl(var(--error));
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+}
+
+.remove-ads-button:hover {
+  background-color: hsl(var(--error) / 0.9);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Ad Banner */
+.ad-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  background-color: hsl(var(--background-secondary));
+  border: 2px solid hsl(var(--primary));
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.ad-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.ad-text h4 {
+  color: hsl(var(--text-primary));
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-sm);
+}
+
+.ad-text p {
+  color: hsl(var(--text-secondary));
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.ad-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ad-upgrade-btn {
+  background-color: hsl(var(--primary));
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex: 1;
+}
+
+.ad-upgrade-btn:hover {
+  background-color: hsl(var(--primary-hover));
+}
+
+.ad-close-btn {
+  background: none;
+  border: none;
+  color: hsl(var(--text-muted));
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.ad-close-btn:hover {
+  background-color: hsl(var(--surface-hover));
+  color: hsl(var(--text-primary));
+}
+
+/* Payment Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+}
+
+.modal-content {
+  background-color: hsl(var(--background-secondary));
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-close {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  background: none;
+  border: none;
+  color: hsl(var(--text-muted));
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+  background-color: hsl(var(--surface-hover));
+  color: hsl(var(--text-primary));
+}
+
+.payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.payment-header h3 {
+  color: hsl(var(--text-primary));
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-sm);
+}
+
+.payment-header p {
+  color: hsl(var(--text-secondary));
+  font-size: var(--font-size-sm);
+}
+
+.payment-element {
+  padding: var(--spacing-md);
+  background-color: hsl(var(--background));
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(var(--border));
+}
+
+.payment-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  background-color: hsl(var(--primary));
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 100px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: hsl(var(--primary-hover));
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: hsl(var(--surface));
+  color: hsl(var(--text-primary));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 100px;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: hsl(var(--surface-hover));
+  border-color: hsl(var(--border-light));
+}
+
+.error-message {
+  color: hsl(var(--error));
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-sm);
+  background-color: hsl(var(--error) / 0.1);
+  border: 1px solid hsl(var(--error) / 0.2);
+  border-radius: var(--radius-md);
+}
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid hsl(var(--border));
+  border-top: 3px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

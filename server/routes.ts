@@ -12,9 +12,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-05-28.basil",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export function setupRoutes(app: Express, httpServer: HttpServer) {
   // REST API Routes
@@ -75,7 +73,7 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
   });
 
   // Stripe payment endpoint for removing ads
-  app.post('/api/create-payment-intent', async (req, res) => {
+  app.post('/api/create-payment-intent', async (req: any, res: any) => {
     try {
       const { amount } = req.body;
       
