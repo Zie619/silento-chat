@@ -14,7 +14,7 @@
    - Go to https://github.com
    - Click "New repository"
    - Name it: `silento-chat`
-   - Make it public
+   - **Make it PRIVATE** (recommended for your personal app)
    - Don't initialize with README (you already have one)
 
 2. **Push your code:**
@@ -30,7 +30,7 @@
 2. **Sign up with GitHub**
 3. **Create New Web Service:**
    - Click "New +" → "Web Service"
-   - Connect your `silento-chat` repository
+   - Connect your **private** `silento-chat` repository
    - Configure:
      - Name: `silento-backend`
      - Environment: `Node`
