@@ -1,8 +1,16 @@
 import { Express } from 'express';
 import { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
+import Stripe from 'stripe';
 import { RoomManager } from './roomManager.js';
 import { setupWebSocketHandler } from './websocketHandler.js';
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+});
 
 const roomManager = new RoomManager();
 

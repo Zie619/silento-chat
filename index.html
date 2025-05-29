@@ -311,10 +311,161 @@
         .loading-message {
             opacity: 0.8;
         }
+        
+        .remove-ads-container {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 100;
+        }
+        
+        .btn-remove-ads {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-remove-ads:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .ad-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .ad-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            text-align: center;
+            color: white;
+        }
+        
+        .ad-header {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        
+        .ad-text {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .subscription-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .subscription-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 400px;
+            color: #1f2937;
+        }
+        
+        .subscription-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .subscription-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+        
+        .subscription-header p {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .subscription-price {
+            text-align: center;
+            margin: 24px 0;
+        }
+        
+        .price-amount {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #10b981;
+        }
+        
+        .price-description {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .subscription-features {
+            list-style: none;
+            padding: 0;
+            margin: 24px 0;
+        }
+        
+        .subscription-features li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+        
+        .subscription-features .check-icon {
+            color: #10b981;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="app">
+        <!-- Remove Ads Button -->
+        <div class="remove-ads-container">
+            <button class="btn-remove-ads" onclick="showSubscriptionModal()" id="removeAdsBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                Remove Ads - $5
+            </button>
+        </div>
+
         <div id="homeScreen">
             <div class="header">
                 <h1>Silento</h1>
@@ -439,13 +590,97 @@
         </div>
         
         <div id="status"></div>
+        
+        <!-- Ad Modal -->
+        <div id="adModal" class="ad-modal hidden">
+            <div class="ad-content">
+                <div class="ad-header">🚀 Upgrade to Silento Pro!</div>
+                <div class="ad-text">
+                    Remove all ads and enjoy unlimited anonymous messaging with premium features for just $5 lifetime!
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-primary" onclick="showSubscriptionModal(); closeAdModal();">
+                        Upgrade Now
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeAdModal();">
+                        Continue with Ads
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Subscription Modal -->
+        <div id="subscriptionModal" class="subscription-modal hidden">
+            <div class="subscription-content">
+                <div class="subscription-header">
+                    <h2>Silento Pro</h2>
+                    <p>Unlock the full potential of anonymous messaging</p>
+                </div>
+                
+                <div class="subscription-price">
+                    <div class="price-amount">$5</div>
+                    <div class="price-description">One-time payment • Lifetime access</div>
+                </div>
+                
+                <ul class="subscription-features">
+                    <li><span class="check-icon">✓</span> Remove all advertisements</li>
+                    <li><span class="check-icon">✓</span> Unlimited room creation</li>
+                    <li><span class="check-icon">✓</span> Priority support</li>
+                    <li><span class="check-icon">✓</span> Early access to new features</li>
+                </ul>
+                
+                <div id="payment-element" style="margin: 24px 0;"></div>
+                
+                <div style="display: flex; gap: 12px;">
+                    <button id="submit-payment" class="btn btn-primary" style="flex: 1;">
+                        Subscribe Now - $5
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeSubscriptionModal();">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <script src="https://js.stripe.com/v3/"></script>
     <script>
         let currentRoomId = null;
         let clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        let hasSubscription = localStorage.getItem('silento_pro') === 'true';
+        let stripe = null;
+        let elements = null;
+        let paymentElement = null;
+
+        // Initialize Stripe
+        if (window.Stripe) {
+            stripe = Stripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+        }
+
+        // Check subscription status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (hasSubscription) {
+                hideRemoveAdsButton();
+            }
+        });
 
         async function createRoom() {
+            try {
+                // Show ad modal if user doesn't have subscription
+                if (!hasSubscription) {
+                    showAdModal();
+                    return;
+                }
+                
+                // Proceed with room creation
+                await proceedWithRoomCreation();
+                
+            } catch (error) {
+                showStatus('Error creating room: ' + error.message, 'error');
+            }
+        }
+
+        async function proceedWithRoomCreation() {
             try {
                 showStatus('Creating room...', 'info');
                 
@@ -468,6 +703,64 @@
             } catch (error) {
                 showStatus('Error creating room: ' + error.message, 'error');
             }
+        }
+
+        function showAdModal() {
+            document.getElementById('adModal').classList.remove('hidden');
+        }
+
+        function closeAdModal() {
+            document.getElementById('adModal').classList.add('hidden');
+            proceedWithRoomCreation();
+        }
+
+        async function showSubscriptionModal() {
+            document.getElementById('subscriptionModal').classList.remove('hidden');
+            
+            if (stripe && !paymentElement) {
+                try {
+                    const response = await fetch('/api/create-payment-intent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 5 })
+                    });
+                    
+                    const { clientSecret } = await response.json();
+                    
+                    elements = stripe.elements({ clientSecret });
+                    paymentElement = elements.create('payment');
+                    paymentElement.mount('#payment-element');
+                    
+                    document.getElementById('submit-payment').onclick = async () => {
+                        const { error } = await stripe.confirmPayment({
+                            elements,
+                            confirmParams: {
+                                return_url: window.location.origin,
+                            },
+                        });
+                        
+                        if (!error) {
+                            localStorage.setItem('silento_pro', 'true');
+                            hasSubscription = true;
+                            hideRemoveAdsButton();
+                            closeSubscriptionModal();
+                            showStatus('Welcome to Silento Pro! Ads removed.', 'success');
+                        } else {
+                            showStatus('Payment failed: ' + error.message, 'error');
+                        }
+                    };
+                } catch (error) {
+                    showStatus('Payment setup failed. Please try again.', 'error');
+                }
+            }
+        }
+
+        function closeSubscriptionModal() {
+            document.getElementById('subscriptionModal').classList.add('hidden');
+        }
+
+        function hideRemoveAdsButton() {
+            document.getElementById('removeAdsBtn').style.display = 'none';
         }
 
         async function joinRoom() {
