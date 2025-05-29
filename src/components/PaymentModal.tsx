@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-// @ts-ignore
-const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+const stripePublicKey = import.meta.env?.VITE_STRIPE_PUBLIC_KEY;
 
 if (!stripePublicKey) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+  console.warn('Missing Stripe public key - payment functionality disabled');
 }
 
 const stripePromise = loadStripe(stripePublicKey);
