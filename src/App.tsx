@@ -147,29 +147,22 @@ function App() {
 
   return (
     <div className="app">
-      {/* Remove Ads Button (top left) */}
+      {/* Main Content */}
+      {renderContent()}
+      
+      {/* Remove Ads Button (temporarily disabled) */}
+      {/*
       <RemoveAdsButton 
         onOpenPayment={handleOpenPayment}
         isPremium={isPremium}
       />
       
-      {/* Ad Banner */}
-      {showAd && (
-        <AdBanner 
-          onClose={handleCloseAd}
-          isPremium={isPremium}
-        />
-      )}
-      
-      {/* Main Content */}
-      {renderContent()}
-      
-      {/* Payment Modal */}
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={handleClosePayment}
         onSuccess={handlePaymentSuccess}
       />
+      */}
     </div>
   );
 }

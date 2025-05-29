@@ -40,7 +40,13 @@ function PaymentOptions({ onClose, onSuccess }: { onClose: () => void; onSuccess
   }, []);
 
   const handleApplePay = async () => {
-    if (!(window as any).ApplePaySession || !(window as any).ApplePaySession.canMakePayments()) {
+    try {
+      const applePaySession = (window as any).ApplePaySession;
+      if (!applePaySession || !applePaySession.canMakePayments()) {
+        alert('Apple Pay is not available on this device');
+        return;
+      }
+    } catch (error) {
       alert('Apple Pay is not available on this device');
       return;
     }
