@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Anonymous Chat</title>
+    <title>Silento</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -174,20 +174,114 @@
             border-left: 3px solid #667eea;
         }
         
-        .input-area {
+        .chat-header {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px 12px 0 0;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .chat-header-content {
             display: flex;
-            gap: 12px;
+            justify-content: space-between;
             align-items: center;
         }
         
-        .input-area .input {
-            flex: 1;
+        .room-info h2 {
             margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
         }
         
-        .input-area .btn {
-            margin: 0;
+        .status-indicator {
+            font-size: 0.8rem;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+        
+        .btn-leave {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-leave:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .input-container {
             padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 8px;
+        }
+        
+        .message-input {
+            flex: 1;
+            margin: 0;
+            background: transparent;
+            border: none;
+            padding: 12px 16px;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            background: transparent;
+        }
+        
+        .media-buttons {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .btn-media {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-media:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        
+        .btn-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .camera-indicator {
+            animation: blink 1.5s infinite;
+            margin-left: 8px;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
         }
         
         .hidden { display: none; }
@@ -206,8 +300,8 @@
     <div class="app">
         <div id="homeScreen">
             <div class="header">
-                <h1>Anonymous Chat</h1>
-                <p>Ephemeral peer-to-peer messaging</p>
+                <h1>Silento</h1>
+                <p>Anonymous ephemeral messaging</p>
             </div>
             
             <div class="actions">
@@ -263,35 +357,50 @@
         </div>
 
         <div id="chatScreen" class="hidden">
-            <div class="header">
-                <h1>Chat Room</h1>
-                <p>Room: <span id="currentRoomDisplay">------</span></p>
+            <div class="chat-header">
+                <div class="chat-header-content">
+                    <div class="room-info">
+                        <h2>Room <span id="currentRoomDisplay">------</span></h2>
+                        <div class="status-indicator">🟢 Connected</div>
+                    </div>
+                    <button class="btn btn-leave" onclick="leaveRoom()">Leave</button>
+                </div>
             </div>
             
             <div class="chat-container">
                 <div id="messages" class="messages-area">
                     <div class="welcome-message">
-                        <p>Welcome to the anonymous chat!</p>
-                        <p>Start typing to send messages...</p>
+                        <p>Welcome to Silento!</p>
+                        <p>Share this room code with others to start chatting...</p>
                     </div>
                 </div>
                 
-                <div class="input-area">
-                    <input type="text" class="input" id="messageInput" placeholder="Type your message..." maxlength="500">
-                    <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display: none;" onchange="handleFileSelect(event)">
-                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
-                        📁
-                    </button>
-                    <button class="btn btn-primary" onclick="sendMessage()">
-                        Send
-                    </button>
+                <div class="input-container">
+                    <div class="input-area">
+                        <input type="text" class="input message-input" id="messageInput" placeholder="Type your message..." maxlength="500">
+                        <div class="media-buttons">
+                            <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display: none;" onchange="handleFileSelect(event)">
+                            <button class="btn btn-media" onclick="document.getElementById('fileInput').click()" title="Upload file">
+                                📁
+                            </button>
+                            <button class="btn btn-media" onclick="capturePhoto()" title="Take photo">
+                                📷
+                            </button>
+                            <button class="btn btn-media" onclick="recordVideo()" title="Record video">
+                                🎥
+                            </button>
+                            <button class="btn btn-media" onclick="recordVoice()" title="Record voice">
+                                🎤
+                            </button>
+                        </div>
+                        <button class="btn btn-send" onclick="sendMessage()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="actions">
-                <button class="btn btn-secondary" onclick="leaveRoom()">
-                    Leave Room
-                </button>
             </div>
         </div>
         
@@ -457,7 +566,8 @@
                             fileName: message.fileName,
                             fileType: message.fileType,
                             fileSize: message.fileSize,
-                            fileData: message.chunkData
+                            fileData: message.chunkData,
+                            fromCamera: message.fromCamera || false
                         };
                         
                         // Remove the loading message and show the actual file
@@ -521,18 +631,29 @@
             
             let content;
             if (isFile && fileData) {
+                const cameraIndicator = fileData.fromCamera ? 
+                    '<svg class="camera-indicator" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; margin-left: 8px; color: #10b981;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>' : '';
+                
                 if (fileData.fileType.startsWith('image/')) {
                     content = `
-                        <strong>${sender} shared an image:</strong><br>
+                        <strong>${sender} shared an image:</strong>${cameraIndicator}<br>
                         <img src="${fileData.fileData}" alt="${fileData.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
                         <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
                     `;
                 } else if (fileData.fileType.startsWith('video/')) {
                     content = `
-                        <strong>${sender} shared a video:</strong><br>
+                        <strong>${sender} shared a video:</strong>${cameraIndicator}<br>
                         <video controls style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
                             <source src="${fileData.fileData}" type="${fileData.fileType}">
                         </video>
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else if (fileData.fileType.startsWith('audio/')) {
+                    content = `
+                        <strong>${sender} shared an audio:</strong>${cameraIndicator}<br>
+                        <audio controls style="width: 100%; margin-top: 8px;">
+                            <source src="${fileData.fileData}" type="${fileData.fileType}">
+                        </audio>
                         <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
                     `;
                 } else {
@@ -608,7 +729,7 @@
             return messageDiv;
         }
 
-        function handleFileSelect(event) {
+        function handleFileSelect(event, fromCamera = false) {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -629,7 +750,8 @@
                     fileName: file.name,
                     fileType: file.type,
                     fileSize: file.size,
-                    fileData: e.target.result
+                    fileData: e.target.result,
+                    fromCamera: fromCamera
                 };
 
                 if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
@@ -642,6 +764,7 @@
                         fileName: file.name,
                         fileType: file.type,
                         fileSize: file.size,
+                        fromCamera: fromCamera,
                         timestamp: Date.now()
                     }));
 
@@ -655,6 +778,7 @@
                             fileType: file.type,
                             fileSize: file.size,
                             chunkData: e.target.result,
+                            fromCamera: fromCamera,
                             timestamp: Date.now()
                         }));
 
@@ -678,6 +802,263 @@
                 loadingMessage.remove();
                 showStatus('Error reading file. Please try again.', 'error');
                 event.target.value = '';
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        async function capturePhoto() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                
+                // Create modal for camera preview
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                video.style.cssText = `
+                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
+                `;
+                
+                const captureBtn = document.createElement('button');
+                captureBtn.textContent = 'Take Photo';
+                captureBtn.className = 'btn btn-primary';
+                captureBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(video);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(captureBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                captureBtn.onclick = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    canvas.toBlob(blob => {
+                        const file = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                        handleCameraCapture(file, true);
+                    }, 'image/jpeg', 0.8);
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+                cancelBtn.onclick = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Camera access denied or not available', 'error');
+            }
+        }
+
+        async function recordVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' }, 
+                    audio: true 
+                });
+                
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                let isRecording = false;
+                
+                // Create modal for video recording
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.style.cssText = `
+                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
+                `;
+                
+                const recordBtn = document.createElement('button');
+                recordBtn.textContent = 'Start Recording';
+                recordBtn.className = 'btn btn-primary';
+                recordBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(video);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(recordBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const file = new File([blob], `camera-video-${Date.now()}.webm`, { type: 'video/webm' });
+                    handleCameraCapture(file, true);
+                };
+                
+                recordBtn.onclick = () => {
+                    if (!isRecording) {
+                        mediaRecorder.start();
+                        recordBtn.textContent = 'Stop Recording';
+                        recordBtn.className = 'btn btn-leave';
+                        isRecording = true;
+                    } else {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(modal);
+                    }
+                };
+                
+                cancelBtn.onclick = () => {
+                    if (isRecording) mediaRecorder.stop();
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Camera/microphone access denied or not available', 'error');
+            }
+        }
+
+        async function recordVoice() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                let isRecording = false;
+                
+                // Create modal for voice recording
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                const indicator = document.createElement('div');
+                indicator.style.cssText = `
+                    width: 100px; height: 100px; border-radius: 50%; 
+                    background: #ef4444; margin-bottom: 20px; animation: pulse 1s infinite;
+                `;
+                
+                const recordBtn = document.createElement('button');
+                recordBtn.textContent = 'Start Recording';
+                recordBtn.className = 'btn btn-primary';
+                recordBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(indicator);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(recordBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const file = new File([blob], `voice-recording-${Date.now()}.webm`, { type: 'audio/webm' });
+                    handleCameraCapture(file, false);
+                };
+                
+                recordBtn.onclick = () => {
+                    if (!isRecording) {
+                        mediaRecorder.start();
+                        recordBtn.textContent = 'Stop Recording';
+                        recordBtn.className = 'btn btn-leave';
+                        isRecording = true;
+                    } else {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(modal);
+                    }
+                };
+                
+                cancelBtn.onclick = () => {
+                    if (isRecording) mediaRecorder.stop();
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Microphone access denied or not available', 'error');
+            }
+        }
+
+        function handleCameraCapture(file, isCamera) {
+            const loadingMessage = showLoadingMessage(file.name, file.type, true);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    fileData: e.target.result,
+                    fromCamera: isCamera
+                };
+
+                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                    window.currentWebSocket.send(JSON.stringify({
+                        type: 'file-start',
+                        roomId: currentRoomId,
+                        clientId: clientId,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        fromCamera: isCamera,
+                        timestamp: Date.now()
+                    }));
+
+                    setTimeout(() => {
+                        window.currentWebSocket.send(JSON.stringify({
+                            type: 'file-chunk',
+                            roomId: currentRoomId,
+                            clientId: clientId,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileSize: file.size,
+                            chunkData: e.target.result,
+                            fromCamera: isCamera,
+                            timestamp: Date.now()
+                        }));
+
+                        setTimeout(() => {
+                            loadingMessage.remove();
+                            addMessageToChat('You', '', true, true, fileData);
+                            showStatus('Media sent successfully!', 'success');
+                        }, 300);
+                    }, 200);
+                } else {
+                    loadingMessage.remove();
+                    showStatus('Not connected to room. Please try reconnecting.', 'error');
+                }
             };
             
             reader.readAsDataURL(file);
