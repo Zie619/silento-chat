@@ -13,12 +13,17 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: process.env.VITE_API_URL || 'https://silento-backend.onrender.com',
         changeOrigin: true,
-        secure: false
+        secure: true
+      },
+      '/health': {
+        target: process.env.VITE_API_URL || 'https://silento-backend.onrender.com',
+        changeOrigin: true,
+        secure: true
       },
       '/ws': {
-        target: 'ws://localhost:5001',
+        target: (process.env.VITE_API_URL || 'https://silento-backend.onrender.com').replace('https:', 'wss:'),
         ws: true,
         changeOrigin: true
       }

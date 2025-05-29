@@ -109,9 +109,8 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     }
     
     private func loadWebApp() {
-        // For development, load from localhost
-        // For production, you would load from your deployed server
-        let urlString = "http://localhost:3000"
+        // Load from deployed server
+        let urlString = "https://silento-backend.onrender.com"
         
         guard let url = URL(string: urlString) else {
             showError("Invalid URL")
@@ -149,7 +148,7 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         activityIndicator.stopAnimating()
-        showError("Failed to connect to server. Make sure the development server is running on localhost:3000")
+        showError("Failed to connect to server. Please check your internet connection.")
     }
     
     // MARK: - WKUIDelegate
