@@ -442,7 +442,9 @@
                     break;
                 case 'file-start':
                     // Someone started sending a file - show loading immediately
+                    console.log('Received file-start message:', message);
                     if (message.clientId !== clientId) {
+                        console.log('Showing loading message for:', message.fileName);
                         const loadingMessage = showLoadingMessage(message.fileName, message.fileType, false);
                         // Store the loading message for later removal
                         window.currentLoadingMessage = loadingMessage;
@@ -632,6 +634,7 @@
 
                 if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
                     // First, notify others that a file is being sent
+                    console.log('Sending file-start message for:', file.name);
                     window.currentWebSocket.send(JSON.stringify({
                         type: 'file-start',
                         roomId: currentRoomId,
