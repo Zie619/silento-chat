@@ -1,18 +1,16 @@
 import { Express } from 'express';
 import { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
+import Stripe from 'stripe';
 import { RoomManager } from './roomManager.js';
 import { setupWebSocketHandler } from './websocketHandler.js';
-import Stripe from 'stripe';
 
-const roomManager = new RoomManager();
-
-// Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const roomManager = new RoomManager();
 
 export function setupRoutes(app: Express, httpServer: HttpServer) {
   // REST API Routes
@@ -72,67 +70,34 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     }
   });
 
-  // Stripe payment endpoint for removing ads
-  app.post('/api/create-payment-intent', async (req: any, res: any) => {
+  // Stripe configuration endpoint
+  app.get('/api/stripe-config', (req, res) => {
+    res.json({ 
+      publicKey: process.env.VITE_STRIPE_PUBLIC_KEY 
+    });
+  });
+
+  // Stripe payment endpoint for $5 lifetime subscription
+  app.post('/api/create-payment-intent', async (req, res) => {
     try {
       const { amount } = req.body;
       
-      if (!amount || amount !== 5) {
-        return res.status(400).json({ error: 'Invalid amount. Must be $5.00' });
-      }
-
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: 'usd',
         metadata: {
-          purpose: 'remove_ads'
+          type: 'silento_pro_subscription'
         }
       });
 
-      res.json({ clientSecret: paymentIntent.client_secret });
+      res.json({ 
+        clientSecret: paymentIntent.client_secret 
+      });
     } catch (error: any) {
       console.error('Error creating payment intent:', error);
-      res.status(500).json({ error: 'Failed to create payment intent: ' + error.message });
-    }
-  });
-
-  // Stripe payment link endpoint for external payment
-  app.post('/api/create-payment-link', async (req: any, res: any) => {
-    try {
-      const { amount } = req.body;
-      
-      if (!amount || amount !== 5) {
-        return res.status(400).json({ error: 'Invalid amount. Must be $5.00' });
-      }
-
-      // First create a product and price
-      const price = await stripe.prices.create({
-        currency: 'usd',
-        product_data: {
-          name: 'Remove Ads - Silento',
-        },
-        unit_amount: amount * 100, // Convert to cents
+      res.status(500).json({ 
+        error: 'Failed to create payment intent: ' + error.message 
       });
-
-      const paymentLink = await stripe.paymentLinks.create({
-        line_items: [
-          {
-            price: price.id,
-            quantity: 1,
-          },
-        ],
-        after_completion: {
-          type: 'redirect',
-          redirect: {
-            url: `${req.headers.origin || 'http://localhost'}?payment=success`
-          }
-        }
-      });
-
-      res.json({ url: paymentLink.url });
-    } catch (error: any) {
-      console.error('Error creating payment link:', error);
-      res.status(500).json({ error: 'Failed to create payment link: ' + error.message });
     }
   });
 

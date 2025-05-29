@@ -40,7 +40,7 @@ app.use((req: any, res: any, next: any) => {
 // Setup routes and WebSocket
 setupRoutes(app, server);
 
-const PORT = parseInt(process.env.PORT || '5000', 10);
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
