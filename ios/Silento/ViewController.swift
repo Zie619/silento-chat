@@ -7,6 +7,13 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private var activityIndicator: UIActivityIndicatorView!
     private var errorLabel: UILabel!
     
+    private var urlsToTry = [
+        "http://172.20.10.2:3000",      // Network IP (for iOS simulator)
+        "http://localhost:3000",         // Localhost (for iOS device)
+        "https://silento-backend.onrender.com"  // Live server (fallback)
+    ]
+    private var currentUrlIndex = 0
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -149,19 +156,33 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         // Update status
         errorLabel.text = "Connecting to server..."
         
-        // Load from deployed server
-        let urlString = "https://silento-backend.onrender.com"
+        // Reset URL index if retrying
+        if currentUrlIndex >= urlsToTry.count {
+            currentUrlIndex = 0
+        }
+        
+        let urlString = urlsToTry[currentUrlIndex]
         
         guard let url = URL(string: urlString) else {
             showError("Invalid URL: \(urlString)")
             return
         }
         
-        print("ViewController: Loading URL: \(urlString)")
+        print("ViewController: Loading URL: \(urlString) (attempt \(currentUrlIndex + 1)/\(urlsToTry.count))")
         
         let request = URLRequest(url: url)
         webView.load(request)
         activityIndicator.startAnimating()
+    }
+    
+    private func tryNextUrl() {
+        currentUrlIndex += 1
+        if currentUrlIndex < urlsToTry.count {
+            print("ViewController: Trying next URL...")
+            loadWebApp()
+        } else {
+            showError("Failed to connect to any server. Please check your internet connection and ensure the development server is running.")
+        }
     }
     
     private func showError(_ message: String) {
@@ -201,6 +222,8 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
             }
         }
         
+        // Reset URL index to start from the beginning
+        currentUrlIndex = 0
         loadWebApp()
     }
     
@@ -222,13 +245,13 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         print("ViewController: Navigation failed with error: \(error.localizedDescription)")
         activityIndicator.stopAnimating()
-        showError("Failed to load: \(error.localizedDescription)")
+        tryNextUrl()
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         print("ViewController: Provisional navigation failed with error: \(error.localizedDescription)")
         activityIndicator.stopAnimating()
-        showError("Failed to connect to server. Please check your internet connection.\n\nError: \(error.localizedDescription)")
+        tryNextUrl()
     }
     
     // MARK: - WKUIDelegate
