@@ -3,8 +3,18 @@ import { Server as HttpServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { RoomManager } from './roomManager.js';
 import { setupWebSocketHandler } from './websocketHandler.js';
+import Stripe from 'stripe';
 
 const roomManager = new RoomManager();
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-05-28.basil",
+});
 
 export function setupRoutes(app: Express, httpServer: HttpServer) {
   // REST API Routes
@@ -61,6 +71,30 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     } catch (error) {
       console.error('Error getting room status:', error);
       res.status(500).json({ error: 'Failed to get room status' });
+    }
+  });
+
+  // Stripe payment endpoint for removing ads
+  app.post('/api/create-payment-intent', async (req, res) => {
+    try {
+      const { amount } = req.body;
+      
+      if (!amount || amount !== 5) {
+        return res.status(400).json({ error: 'Invalid amount. Must be $5.00' });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+        metadata: {
+          purpose: 'remove_ads'
+        }
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error('Error creating payment intent:', error);
+      res.status(500).json({ error: 'Failed to create payment intent: ' + error.message });
     }
   });
 
