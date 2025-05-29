@@ -9,4 +9,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-    autoDeploy: false 
+    autoDeploy: false
+    rootDir: . 
