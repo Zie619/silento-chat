@@ -591,20 +591,23 @@
         
         <div id="status"></div>
         
-        <!-- Ad Modal -->
+        <!-- Simple Ad Modal -->
         <div id="adModal" class="ad-modal hidden">
             <div class="ad-content">
-                <div class="ad-header">🚀 Upgrade to Silento Pro!</div>
+                <div class="ad-header">📱 Get CloudHost Pro</div>
                 <div class="ad-text">
-                    Remove all ads and enjoy unlimited anonymous messaging with premium features for just $5 lifetime!
+                    Need reliable hosting for your apps? CloudHost Pro offers 99.9% uptime, lightning-fast servers, and 24/7 support starting at just $9.99/month!
                 </div>
-                <div style="display: flex; gap: 12px;">
-                    <button class="btn btn-primary" onclick="showSubscriptionModal(); closeAdModal();">
-                        Upgrade Now
+                <div style="display: flex; gap: 12px; margin-top: 16px;">
+                    <button class="btn btn-primary" onclick="window.open('https://example.com', '_blank');">
+                        Learn More
                     </button>
                     <button class="btn btn-secondary" onclick="closeAdModal();">
-                        Continue with Ads
+                        Skip Ad
                     </button>
+                </div>
+                <div style="font-size: 0.7rem; color: rgba(255,255,255,0.6); margin-top: 12px;">
+                    Advertisement • Closing in <span id="adTimer">3</span> seconds
                 </div>
             </div>
         </div>
@@ -654,7 +657,18 @@
 
         // Initialize Stripe
         if (window.Stripe) {
-            stripe = Stripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+            // We'll set this dynamically after getting the key from server
+            initializeStripe();
+        }
+
+        async function initializeStripe() {
+            try {
+                const response = await fetch('/api/stripe-config');
+                const { publicKey } = await response.json();
+                stripe = Stripe(publicKey);
+            } catch (error) {
+                console.error('Failed to initialize Stripe:', error);
+            }
         }
 
         // Check subscription status on page load
@@ -666,13 +680,18 @@
 
         async function createRoom() {
             try {
-                // Show ad modal if user doesn't have subscription
+                // Show ad if user doesn't have subscription, but let them continue
                 if (!hasSubscription) {
-                    showAdModal();
+                    showSimpleAd();
+                    // Continue with room creation after showing ad
+                    setTimeout(() => {
+                        closeSimpleAd();
+                        proceedWithRoomCreation();
+                    }, 3000); // Show ad for 3 seconds
                     return;
                 }
                 
-                // Proceed with room creation
+                // Proceed with room creation immediately if subscribed
                 await proceedWithRoomCreation();
                 
             } catch (error) {
@@ -705,13 +724,35 @@
             }
         }
 
-        function showAdModal() {
+        function showSimpleAd() {
             document.getElementById('adModal').classList.remove('hidden');
+            startAdTimer();
+        }
+
+        function closeSimpleAd() {
+            document.getElementById('adModal').classList.add('hidden');
+        }
+
+        function startAdTimer() {
+            let seconds = 3;
+            const timerElement = document.getElementById('adTimer');
+            
+            const countdown = setInterval(() => {
+                seconds--;
+                if (timerElement) {
+                    timerElement.textContent = seconds;
+                }
+                
+                if (seconds <= 0) {
+                    clearInterval(countdown);
+                    closeSimpleAd();
+                    proceedWithRoomCreation();
+                }
+            }, 1000);
         }
 
         function closeAdModal() {
             document.getElementById('adModal').classList.add('hidden');
-            proceedWithRoomCreation();
         }
 
         async function showSubscriptionModal() {
@@ -732,21 +773,32 @@
                     paymentElement.mount('#payment-element');
                     
                     document.getElementById('submit-payment').onclick = async () => {
-                        const { error } = await stripe.confirmPayment({
+                        const submitButton = document.getElementById('submit-payment');
+                        submitButton.textContent = 'Processing...';
+                        submitButton.disabled = true;
+                        
+                        const { error, paymentIntent } = await stripe.confirmPayment({
                             elements,
                             confirmParams: {
                                 return_url: window.location.origin,
                             },
+                            redirect: 'if_required'
                         });
                         
-                        if (!error) {
+                        if (!error && paymentIntent.status === 'succeeded') {
+                            // Payment successful - save to localStorage
                             localStorage.setItem('silento_pro', 'true');
+                            localStorage.setItem('silento_pro_payment_id', paymentIntent.id);
+                            localStorage.setItem('silento_pro_date', new Date().toISOString());
+                            
                             hasSubscription = true;
                             hideRemoveAdsButton();
                             closeSubscriptionModal();
-                            showStatus('Welcome to Silento Pro! Ads removed.', 'success');
+                            showStatus('Welcome to Silento Pro! Ads permanently removed.', 'success');
                         } else {
-                            showStatus('Payment failed: ' + error.message, 'error');
+                            showStatus('Payment failed: ' + (error?.message || 'Unknown error'), 'error');
+                            submitButton.textContent = 'Subscribe Now - $5';
+                            submitButton.disabled = false;
                         }
                     };
                 } catch (error) {

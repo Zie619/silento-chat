@@ -70,6 +70,13 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     }
   });
 
+  // Stripe configuration endpoint
+  app.get('/api/stripe-config', (req, res) => {
+    res.json({ 
+      publicKey: process.env.VITE_STRIPE_PUBLIC_KEY 
+    });
+  });
+
   // Stripe payment endpoint for $5 lifetime subscription
   app.post('/api/create-payment-intent', async (req, res) => {
     try {
