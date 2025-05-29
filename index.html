@@ -191,6 +191,15 @@
         }
         
         .hidden { display: none; }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-message {
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -434,13 +443,20 @@
                 case 'file-chunk':
                     // Received file from another user
                     if (message.clientId !== clientId) {
-                        const fileData = {
-                            fileName: message.fileName,
-                            fileType: message.fileType,
-                            fileSize: message.fileSize,
-                            fileData: message.chunkData
-                        };
-                        addMessageToChat('Anonymous', '', false, true, fileData);
+                        // Show loading message first
+                        const loadingMessage = showLoadingMessage(message.fileName, message.fileType, false);
+                        
+                        // Simulate processing time and then show the actual file
+                        setTimeout(() => {
+                            const fileData = {
+                                fileName: message.fileName,
+                                fileType: message.fileType,
+                                fileSize: message.fileSize,
+                                fileData: message.chunkData
+                            };
+                            loadingMessage.remove();
+                            addMessageToChat('Anonymous', '', false, true, fileData);
+                        }, 800); // Slightly longer delay for received files to show loading
                     }
                     break;
                 case 'error':
@@ -538,6 +554,51 @@
             messagesArea.scrollTop = messagesArea.scrollHeight;
         }
 
+        function showLoadingMessage(fileName, fileType, isOwnMessage = false) {
+            const messagesArea = document.getElementById('messages');
+            const welcomeMessage = messagesArea.querySelector('.welcome-message');
+            
+            // Remove welcome message
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message loading-message';
+            
+            const sender = isOwnMessage ? 'You' : 'Anonymous';
+            const fileTypeText = fileType.startsWith('image/') ? 'image' : fileType.startsWith('video/') ? 'video' : 'file';
+            
+            messageDiv.innerHTML = `
+                <strong>${sender} ${isOwnMessage ? 'are sending' : 'is sending'} ${fileTypeText.includes('image') ? 'an' : 'a'} ${fileTypeText}:</strong><br>
+                <div style="display: flex; align-items: center; margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div class="loading-spinner" style="
+                        width: 20px; 
+                        height: 20px; 
+                        border: 2px solid rgba(255,255,255,0.3);
+                        border-top: 2px solid #667eea;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin-right: 10px;
+                    "></div>
+                    <span style="font-size: 0.9em; color: #ccc;">${fileName}</span>
+                </div>
+                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
+                    ${new Date().toLocaleTimeString()}
+                </div>
+            `;
+            
+            if (isOwnMessage) {
+                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+                messageDiv.style.borderLeftColor = '#22c55e';
+            }
+            
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            
+            return messageDiv;
+        }
+
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -549,6 +610,9 @@
                 event.target.value = '';
                 return;
             }
+
+            // Show loading message immediately
+            const loadingMessage = showLoadingMessage(file.name, file.type, true);
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -572,10 +636,14 @@
                         timestamp: Date.now()
                     }));
 
-                    // Add file to local chat
-                    addMessageToChat('You', '', true, true, fileData);
-                    showStatus('File sent successfully!', 'success');
+                    // Replace loading message with actual file
+                    setTimeout(() => {
+                        loadingMessage.remove();
+                        addMessageToChat('You', '', true, true, fileData);
+                        showStatus('File sent successfully!', 'success');
+                    }, 500); // Small delay to show loading
                 } else {
+                    loadingMessage.remove();
                     showStatus('Not connected to room. Please try reconnecting.', 'error');
                 }
                 
@@ -584,6 +652,7 @@
             };
             
             reader.onerror = function() {
+                loadingMessage.remove();
                 showStatus('Error reading file. Please try again.', 'error');
                 event.target.value = '';
             };
