@@ -96,6 +96,46 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
     }
   });
 
+  // Stripe payment link endpoint for external payment
+  app.post('/api/create-payment-link', async (req: any, res: any) => {
+    try {
+      const { amount } = req.body;
+      
+      if (!amount || amount !== 5) {
+        return res.status(400).json({ error: 'Invalid amount. Must be $5.00' });
+      }
+
+      // First create a product and price
+      const price = await stripe.prices.create({
+        currency: 'usd',
+        product_data: {
+          name: 'Remove Ads - Silento',
+        },
+        unit_amount: amount * 100, // Convert to cents
+      });
+
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items: [
+          {
+            price: price.id,
+            quantity: 1,
+          },
+        ],
+        after_completion: {
+          type: 'redirect',
+          redirect: {
+            url: `${req.headers.origin || 'http://localhost'}?payment=success`
+          }
+        }
+      });
+
+      res.json({ url: paymentLink.url });
+    } catch (error: any) {
+      console.error('Error creating payment link:', error);
+      res.status(500).json({ error: 'Failed to create payment link: ' + error.message });
+    }
+  });
+
   // WebSocket server setup on distinct path
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   setupWebSocketHandler(wss, roomManager);
