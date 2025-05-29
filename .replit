@@ -13,11 +13,20 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Server"
+args = "Frontend"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Frontend"
+args = "Server"
+
+[[workflows.workflow]]
+name = "Frontend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx vite --port 5000 --host 0.0.0.0"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Server"
@@ -26,16 +35,7 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"
-waitForPort = 5000
-
-[[workflows.workflow]]
-name = "Frontend"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "sudo npx vite --port 80 --host 0.0.0.0"
-waitForPort = 80
+waitForPort = 3000
 
 [deployment]
 run = ["sh", "-c", "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts"]
@@ -43,6 +43,10 @@ run = ["sh", "-c", "cd server && node --loader ts-node/esm --experimental-specif
 [[ports]]
 localPort = 80
 externalPort = 3000
+
+[[ports]]
+localPort = 3000
+externalPort = 3001
 
 [[ports]]
 localPort = 5000
