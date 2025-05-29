@@ -1,15 +1,1535 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Silento</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Anonymous Chat</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 40px 0;
+        }
+        
+        .btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+        
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+        
+        .room-info {
+            text-align: center;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        
+        .room-code {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #667eea;
+            margin: 16px 0;
+        }
+        
+        .footer {
+            margin-top: auto;
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            padding: 20px 0;
+        }
+        
+        .input {
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 1rem;
+            margin: 10px 0;
+        }
+        
+        .input::placeholder {
+            color: #888;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 60vh;
+        }
+        
+        .messages-area {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            color: #888;
+            padding: 20px 0;
+        }
+        
+        .message {
+            margin: 8px 0;
+            padding: 12px;
+            border-radius: 8px;
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 3px solid #667eea;
+        }
+        
+        .chat-header {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px 12px 0 0;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .chat-header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .room-info h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            font-size: 0.8rem;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+        
+        .btn-leave {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-leave:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .input-container {
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .text-input-area {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .message-input {
+            flex: 1;
+            margin: 0;
+            background: transparent;
+            border: none;
+            padding: 12px 16px;
+            color: white;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            background: transparent;
+        }
+        
+        .message-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .media-actions {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        
+        .btn-media-action {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: white;
+        }
+        
+        .btn-media-action:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .btn-media-action span {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .btn-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .camera-indicator {
+            animation: blink 1.5s infinite;
+            margin-left: 8px;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        .hidden { display: none; }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-message {
+            opacity: 0.8;
+        }
+        
+        .remove-ads-container {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 100;
+        }
+        
+        .btn-remove-ads {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-remove-ads:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .ad-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .ad-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 320px;
+            text-align: center;
+            color: white;
+        }
+        
+        .ad-header {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        
+        .ad-text {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .subscription-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .subscription-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 400px;
+            color: #1f2937;
+        }
+        
+        .subscription-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .subscription-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+        
+        .subscription-header p {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .subscription-price {
+            text-align: center;
+            margin: 24px 0;
+        }
+        
+        .price-amount {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #10b981;
+        }
+        
+        .price-description {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .subscription-features {
+            list-style: none;
+            padding: 0;
+            margin: 24px 0;
+        }
+        
+        .subscription-features li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+        
+        .subscription-features .check-icon {
+            color: #10b981;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Remove Ads Button -->
+        <div class="remove-ads-container">
+            <button class="btn-remove-ads" onclick="showSubscriptionModal()" id="removeAdsBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                Remove Ads - $5
+            </button>
+        </div>
+
+        <div id="homeScreen">
+            <div class="header">
+                <h1>Silento</h1>
+                <p>Anonymous ephemeral messaging</p>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="createRoom()">
+                    Create Room
+                </button>
+                <button class="btn btn-secondary" onclick="showJoinRoom()">
+                    Join Room
+                </button>
+            </div>
+            
+            <div class="footer">
+                <p>No registration required • No data stored • Completely anonymous</p>
+            </div>
+        </div>
+        
+        <div id="createScreen" class="hidden">
+            <div class="header">
+                <h1>Room Created!</h1>
+            </div>
+            
+            <div class="room-info">
+                <p>Share this code with others:</p>
+                <div class="room-code" id="roomCode">------</div>
+                <p>Others can join using this 6-character code</p>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" onclick="startChat()">
+                    Start Chatting
+                </button>
+                <button class="btn btn-secondary" onclick="goHome()">
+                    Back to Home
+                </button>
+            </div>
+        </div>
+        
+        <div id="joinScreen" class="hidden">
+            <div class="header">
+                <h1>Join Room</h1>
+                <p>Enter the 6-character room code</p>
+            </div>
+            
+            <div class="actions">
+                <input type="text" class="input" id="roomInput" placeholder="Enter room code" maxlength="6">
+                <button class="btn btn-primary" onclick="joinRoom()">
+                    Join Room
+                </button>
+                <button class="btn btn-secondary" onclick="goHome()">
+                    Back
+                </button>
+            </div>
+        </div>
+
+        <div id="chatScreen" class="hidden">
+            <div class="chat-header">
+                <div class="chat-header-content">
+                    <div class="room-info">
+                        <h2>Room <span id="currentRoomDisplay">------</span></h2>
+                        <div class="status-indicator">🟢 Connected</div>
+                    </div>
+                    <button class="btn btn-leave" onclick="leaveRoom()">Leave</button>
+                </div>
+            </div>
+            
+            <div class="chat-container">
+                <div id="messages" class="messages-area">
+                    <div class="welcome-message">
+                        <p>Welcome to Silento!</p>
+                        <p>Share this room code with others to start chatting...</p>
+                    </div>
+                </div>
+                
+                <div class="input-container">
+                    <div class="text-input-area">
+                        <input type="text" class="input message-input" id="messageInput" placeholder="Type your message..." maxlength="500">
+                        <button class="btn btn-send" onclick="sendMessage()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="media-actions">
+                        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display: none;" onchange="handleFileSelect(event)">
+                        <button class="btn btn-media-action" onclick="document.getElementById('fileInput').click()" title="Upload file">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"></path>
+                            </svg>
+                            <span>Files</span>
+                        </button>
+                        <button class="btn btn-media-action" onclick="capturePhoto()" title="Take photo">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                <circle cx="12" cy="13" r="4"></circle>
+                            </svg>
+                            <span>Photo</span>
+                        </button>
+                        <button class="btn btn-media-action" onclick="recordVideo()" title="Record video">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="23,7 16,12 23,17"></polygon>
+                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                            </svg>
+                            <span>Video</span>
+                        </button>
+                        <button class="btn btn-media-action" onclick="recordVoice()" title="Record voice">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                            <span>Voice</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="status"></div>
+        
+        <!-- Simple Ad Modal -->
+        <div id="adModal" class="ad-modal hidden">
+            <div class="ad-content">
+                <div class="ad-header">📱 Get CloudHost Pro</div>
+                <div class="ad-text">
+                    Need reliable hosting for your apps? CloudHost Pro offers 99.9% uptime, lightning-fast servers, and 24/7 support starting at just $9.99/month!
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 16px;">
+                    <button class="btn btn-primary" onclick="window.open('https://example.com', '_blank');">
+                        Learn More
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeAdModal();">
+                        Skip Ad
+                    </button>
+                </div>
+                <div style="font-size: 0.7rem; color: rgba(255,255,255,0.6); margin-top: 12px;">
+                    Advertisement • Closing in <span id="adTimer">3</span> seconds
+                </div>
+            </div>
+        </div>
+        
+        <!-- Subscription Modal -->
+        <div id="subscriptionModal" class="subscription-modal hidden">
+            <div class="subscription-content">
+                <div class="subscription-header">
+                    <h2>Silento Pro</h2>
+                    <p>Unlock the full potential of anonymous messaging</p>
+                </div>
+                
+                <div class="subscription-price">
+                    <div class="price-amount">$5</div>
+                    <div class="price-description">One-time payment • Lifetime access</div>
+                </div>
+                
+                <ul class="subscription-features">
+                    <li><span class="check-icon">✓</span> Remove all advertisements</li>
+                    <li><span class="check-icon">✓</span> Unlimited room creation</li>
+                    <li><span class="check-icon">✓</span> Priority support</li>
+                    <li><span class="check-icon">✓</span> Early access to new features</li>
+                </ul>
+                
+                <div id="payment-element" style="margin: 24px 0;"></div>
+                
+                <div style="display: flex; gap: 12px;">
+                    <button id="submit-payment" class="btn btn-primary" style="flex: 1;">
+                        Subscribe Now - $5
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeSubscriptionModal();">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        let currentRoomId = null;
+        let clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        let hasSubscription = localStorage.getItem('silento_pro') === 'true';
+        let stripe = null;
+        let elements = null;
+        let paymentElement = null;
+
+        // Initialize Stripe
+        if (window.Stripe) {
+            // We'll set this dynamically after getting the key from server
+            initializeStripe();
+        }
+
+        async function initializeStripe() {
+            try {
+                const response = await fetch('/api/stripe-config');
+                const { publicKey } = await response.json();
+                stripe = Stripe(publicKey);
+            } catch (error) {
+                console.error('Failed to initialize Stripe:', error);
+            }
+        }
+
+        // Check subscription status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (hasSubscription) {
+                hideRemoveAdsButton();
+            }
+        });
+
+        async function createRoom() {
+            try {
+                // Show ad if user doesn't have subscription, but let them continue
+                if (!hasSubscription) {
+                    showSimpleAd();
+                    // Continue with room creation after showing ad
+                    setTimeout(() => {
+                        closeSimpleAd();
+                        proceedWithRoomCreation();
+                    }, 3000); // Show ad for 3 seconds
+                    return;
+                }
+                
+                // Proceed with room creation immediately if subscribed
+                await proceedWithRoomCreation();
+                
+            } catch (error) {
+                showStatus('Error creating room: ' + error.message, 'error');
+            }
+        }
+
+        async function proceedWithRoomCreation() {
+            try {
+                showStatus('Creating room...', 'info');
+                
+                const response = await fetch('/api/create-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to create room');
+                }
+                
+                const data = await response.json();
+                currentRoomId = data.roomId;
+                
+                document.getElementById('roomCode').textContent = data.roomId;
+                showScreen('createScreen');
+                showStatus('Room created successfully!', 'success');
+                
+            } catch (error) {
+                showStatus('Error creating room: ' + error.message, 'error');
+            }
+        }
+
+        function showSimpleAd() {
+            document.getElementById('adModal').classList.remove('hidden');
+            startAdTimer();
+        }
+
+        function closeSimpleAd() {
+            document.getElementById('adModal').classList.add('hidden');
+        }
+
+        function startAdTimer() {
+            let seconds = 3;
+            const timerElement = document.getElementById('adTimer');
+            
+            const countdown = setInterval(() => {
+                seconds--;
+                if (timerElement) {
+                    timerElement.textContent = seconds;
+                }
+                
+                if (seconds <= 0) {
+                    clearInterval(countdown);
+                    closeSimpleAd();
+                    proceedWithRoomCreation();
+                }
+            }, 1000);
+        }
+
+        function closeAdModal() {
+            document.getElementById('adModal').classList.add('hidden');
+        }
+
+        async function showSubscriptionModal() {
+            document.getElementById('subscriptionModal').classList.remove('hidden');
+            
+            if (stripe && !paymentElement) {
+                try {
+                    const response = await fetch('/api/create-payment-intent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: 5 })
+                    });
+                    
+                    const { clientSecret } = await response.json();
+                    
+                    elements = stripe.elements({ clientSecret });
+                    paymentElement = elements.create('payment');
+                    paymentElement.mount('#payment-element');
+                    
+                    document.getElementById('submit-payment').onclick = async () => {
+                        const submitButton = document.getElementById('submit-payment');
+                        submitButton.textContent = 'Processing...';
+                        submitButton.disabled = true;
+                        
+                        const { error, paymentIntent } = await stripe.confirmPayment({
+                            elements,
+                            confirmParams: {
+                                return_url: window.location.origin,
+                            },
+                            redirect: 'if_required'
+                        });
+                        
+                        if (!error && paymentIntent.status === 'succeeded') {
+                            // Payment successful - save to localStorage
+                            localStorage.setItem('silento_pro', 'true');
+                            localStorage.setItem('silento_pro_payment_id', paymentIntent.id);
+                            localStorage.setItem('silento_pro_date', new Date().toISOString());
+                            
+                            hasSubscription = true;
+                            hideRemoveAdsButton();
+                            closeSubscriptionModal();
+                            showStatus('Welcome to Silento Pro! Ads permanently removed.', 'success');
+                        } else {
+                            showStatus('Payment failed: ' + (error?.message || 'Unknown error'), 'error');
+                            submitButton.textContent = 'Subscribe Now - $5';
+                            submitButton.disabled = false;
+                        }
+                    };
+                } catch (error) {
+                    showStatus('Payment setup failed. Please try again.', 'error');
+                }
+            }
+        }
+
+        function closeSubscriptionModal() {
+            document.getElementById('subscriptionModal').classList.add('hidden');
+        }
+
+        function hideRemoveAdsButton() {
+            document.getElementById('removeAdsBtn').style.display = 'none';
+        }
+
+        async function joinRoom() {
+            const roomId = document.getElementById('roomInput').value.toUpperCase();
+            
+            if (!roomId || roomId.length !== 6) {
+                showStatus('Please enter a valid 6-character room code', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Checking room...', 'info');
+                
+                // First check if room exists
+                const statusResponse = await fetch(`/api/room/${roomId}/status`);
+                
+                if (!statusResponse.ok) {
+                    showStatus('Room not found or has expired', 'error');
+                    return;
+                }
+                
+                const roomStatus = await statusResponse.json();
+                
+                // Now join the room
+                const response = await fetch('/api/join-room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId, clientId })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to join room');
+                }
+                
+                currentRoomId = roomId;
+                showStatus(`Joining room with ${roomStatus.peerCount} peer(s)...`, 'success');
+                startChat();
+                
+            } catch (error) {
+                showStatus('Error joining room: ' + error.message, 'error');
+            }
+        }
+
+        function startChat() {
+            if (currentRoomId) {
+                // Initialize WebSocket connection for real-time chat
+                connectToRoom(currentRoomId);
+                showChatInterface();
+            }
+        }
+
+        function connectToRoom(roomId) {
+            currentRoomId = roomId;
+            
+            // Clear previous chat history when joining a new room
+            const messagesArea = document.getElementById('messages');
+            messagesArea.innerHTML = `
+                <div class="welcome-message" style="text-align: center; color: #888; padding: 20px; font-style: italic;">
+                    Welcome to room ${roomId}! Share this code with others to invite them.
+                </div>
+            `;
+            
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            const ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                // Initialize connection with room and client info
+                ws.send(JSON.stringify({
+                    type: 'init',
+                    roomId: roomId,
+                    clientId: clientId
+                }));
+                showStatus('Connected to room: ' + roomId, 'success');
+            };
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+            
+            ws.onerror = (error) => {
+                console.log('WebSocket error:', error);
+                showStatus('Connection error. Please try again.', 'error');
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                showStatus('Disconnected from room', 'error');
+            };
+            
+            window.currentWebSocket = ws;
+        }
+
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'init-success':
+                    showStatus(`Connected! ${message.peers ? message.peers.length : 0} other(s) in room`, 'success');
+                    break;
+                case 'peer-joined':
+                    showStatus(`Someone joined the room!`, 'success');
+                    addMessageToChat('System', 'A new person joined the chat');
+                    break;
+                case 'peer-left':
+                    showStatus(`Someone left the room`, 'info');
+                    addMessageToChat('System', 'Someone left the chat');
+                    break;
+                case 'message':
+                    // Received message from another user
+                    if (message.clientId !== clientId) {
+                        addMessageToChat('Anonymous', message.message);
+                    }
+                    break;
+                case 'file-start':
+                    // Someone started sending a file - show loading immediately
+                    console.log('Received file-start message:', message);
+                    if (message.clientId !== clientId) {
+                        console.log('Showing loading message for:', message.fileName);
+                        const loadingMessage = showLoadingMessage(message.fileName, message.fileType, false);
+                        // Store the loading message for later removal
+                        window.currentLoadingMessage = loadingMessage;
+                    }
+                    break;
+                case 'file-chunk':
+                    // Received actual file data from another user
+                    if (message.clientId !== clientId) {
+                        const fileData = {
+                            fileName: message.fileName,
+                            fileType: message.fileType,
+                            fileSize: message.fileSize,
+                            fileData: message.chunkData,
+                            fromCamera: message.fromCamera || false
+                        };
+                        
+                        // Remove the loading message and show the actual file
+                        if (window.currentLoadingMessage) {
+                            window.currentLoadingMessage.remove();
+                            window.currentLoadingMessage = null;
+                        }
+                        addMessageToChat('Anonymous', '', false, true, fileData);
+                    }
+                    break;
+                case 'error':
+                    showStatus('Error: ' + message.message, 'error');
+                    break;
+            }
+        }
+
+        function showChatInterface() {
+            document.getElementById('currentRoomDisplay').textContent = currentRoomId;
+            showScreen('chatScreen');
+            document.getElementById('messageInput').focus();
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const messageText = messageInput.value.trim();
+            
+            if (!messageText) return;
+            
+            if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                // Send message via WebSocket for real-time delivery
+                window.currentWebSocket.send(JSON.stringify({
+                    type: 'message',
+                    roomId: currentRoomId,
+                    clientId: clientId,
+                    message: messageText,
+                    timestamp: Date.now()
+                }));
+                
+                // Add message to local chat
+                addMessageToChat('You', messageText, true);
+                
+                // Clear input and refocus for next message
+                messageInput.value = '';
+                messageInput.focus();
+            } else {
+                showStatus('Not connected to room. Please try reconnecting.', 'error');
+            }
+        }
+
+        function addMessageToChat(sender, message, isOwnMessage = false, isFile = false, fileData = null) {
+            const messagesArea = document.getElementById('messages');
+            const welcomeMessage = messagesArea.querySelector('.welcome-message');
+            
+            // Remove welcome message on first real message
+            if (welcomeMessage && sender !== 'System') {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            let content;
+            if (isFile && fileData) {
+                const cameraIndicator = fileData.fromCamera ? 
+                    '<svg class="camera-indicator" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; margin-left: 8px; color: #10b981;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>' : '';
+                
+                if (fileData.fileType.startsWith('image/')) {
+                    content = `
+                        <strong>${sender} shared an image:</strong>${cameraIndicator}<br>
+                        <img src="${fileData.fileData}" alt="${fileData.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else if (fileData.fileType.startsWith('video/')) {
+                    content = `
+                        <strong>${sender} shared a video:</strong>${cameraIndicator}<br>
+                        <video controls style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
+                            <source src="${fileData.fileData}" type="${fileData.fileType}">
+                        </video>
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else if (fileData.fileType.startsWith('audio/')) {
+                    content = `
+                        <strong>${sender} shared an audio:</strong>${cameraIndicator}<br>
+                        <audio controls style="width: 100%; margin-top: 8px;">
+                            <source src="${fileData.fileData}" type="${fileData.fileType}">
+                        </audio>
+                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
+                    `;
+                } else {
+                    content = `
+                        <strong>${sender} shared a file:</strong><br>
+                        <a href="${fileData.fileData}" download="${fileData.fileName}" style="color: #667eea; text-decoration: none;">
+                            📎 ${fileData.fileName}
+                        </a>
+                    `;
+                }
+            } else {
+                content = `<strong>${sender}:</strong> ${message}`;
+            }
+            
+            messageDiv.innerHTML = `
+                ${content}
+                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
+                    ${new Date().toLocaleTimeString()}
+                </div>
+            `;
+            
+            if (isOwnMessage) {
+                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+                messageDiv.style.borderLeftColor = '#22c55e';
+            }
+            
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function showLoadingMessage(fileName, fileType, isOwnMessage = false) {
+            const messagesArea = document.getElementById('messages');
+            const welcomeMessage = messagesArea.querySelector('.welcome-message');
+            
+            // Remove welcome message
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message loading-message';
+            
+            const sender = isOwnMessage ? 'You' : 'Anonymous';
+            const fileTypeText = fileType.startsWith('image/') ? 'image' : fileType.startsWith('video/') ? 'video' : 'file';
+            
+            messageDiv.innerHTML = `
+                <strong>${sender} ${isOwnMessage ? 'are sending' : 'is sending'} ${fileTypeText.includes('image') ? 'an' : 'a'} ${fileTypeText}:</strong><br>
+                <div style="display: flex; align-items: center; margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <div class="loading-spinner" style="
+                        width: 20px; 
+                        height: 20px; 
+                        border: 2px solid rgba(255,255,255,0.3);
+                        border-top: 2px solid #667eea;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin-right: 10px;
+                    "></div>
+                    <span style="font-size: 0.9em; color: #ccc;">${fileName}</span>
+                </div>
+                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
+                    ${new Date().toLocaleTimeString()}
+                </div>
+            `;
+            
+            if (isOwnMessage) {
+                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+                messageDiv.style.borderLeftColor = '#22c55e';
+            }
+            
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            
+            return messageDiv;
+        }
+
+        function handleFileSelect(event, fromCamera = false) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Check file size (limit to 10MB for demo)
+            if (file.size > 10 * 1024 * 1024) {
+                showStatus('File too large. Maximum size is 10MB.', 'error');
+                // Reset file input
+                event.target.value = '';
+                return;
+            }
+
+            // Show loading message immediately
+            const loadingMessage = showLoadingMessage(file.name, file.type, true);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    fileData: e.target.result,
+                    fromCamera: fromCamera
+                };
+
+                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                    // First, notify others that a file is being sent
+                    console.log('Sending file-start message for:', file.name);
+                    window.currentWebSocket.send(JSON.stringify({
+                        type: 'file-start',
+                        roomId: currentRoomId,
+                        clientId: clientId,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        fromCamera: fromCamera,
+                        timestamp: Date.now()
+                    }));
+
+                    // Then send the actual file data
+                    setTimeout(() => {
+                        window.currentWebSocket.send(JSON.stringify({
+                            type: 'file-chunk',
+                            roomId: currentRoomId,
+                            clientId: clientId,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileSize: file.size,
+                            chunkData: e.target.result,
+                            fromCamera: fromCamera,
+                            timestamp: Date.now()
+                        }));
+
+                        // Replace loading message with actual file
+                        setTimeout(() => {
+                            loadingMessage.remove();
+                            addMessageToChat('You', '', true, true, fileData);
+                            showStatus('File sent successfully!', 'success');
+                        }, 300); // Small delay to show loading
+                    }, 200); // Brief delay to ensure file-start arrives first
+                } else {
+                    loadingMessage.remove();
+                    showStatus('Not connected to room. Please try reconnecting.', 'error');
+                }
+                
+                // Reset file input for next file
+                event.target.value = '';
+            };
+            
+            reader.onerror = function() {
+                loadingMessage.remove();
+                showStatus('Error reading file. Please try again.', 'error');
+                event.target.value = '';
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        async function capturePhoto() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                
+                // Create modal for camera preview
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                video.style.cssText = `
+                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
+                `;
+                
+                const captureBtn = document.createElement('button');
+                captureBtn.textContent = 'Take Photo';
+                captureBtn.className = 'btn btn-primary';
+                captureBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(video);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(captureBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                captureBtn.onclick = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    canvas.toBlob(blob => {
+                        const file = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                        handleCameraCapture(file, true);
+                    }, 'image/jpeg', 0.8);
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+                cancelBtn.onclick = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Camera access denied or not available', 'error');
+            }
+        }
+
+        async function recordVideo() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' }, 
+                    audio: true 
+                });
+                
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                let isRecording = false;
+                
+                // Create modal for video recording
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.style.cssText = `
+                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
+                `;
+                
+                const recordBtn = document.createElement('button');
+                recordBtn.textContent = 'Start Recording';
+                recordBtn.className = 'btn btn-primary';
+                recordBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(video);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(recordBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const file = new File([blob], `camera-video-${Date.now()}.webm`, { type: 'video/webm' });
+                    handleCameraCapture(file, true);
+                };
+                
+                recordBtn.onclick = () => {
+                    if (!isRecording) {
+                        mediaRecorder.start();
+                        recordBtn.textContent = 'Stop Recording';
+                        recordBtn.className = 'btn btn-leave';
+                        isRecording = true;
+                    } else {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(modal);
+                    }
+                };
+                
+                cancelBtn.onclick = () => {
+                    if (isRecording) mediaRecorder.stop();
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Camera/microphone access denied or not available', 'error');
+            }
+        }
+
+        async function recordVoice() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks = [];
+                let isRecording = false;
+                
+                // Create modal for voice recording
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
+                    flex-direction: column; align-items: center; justify-content: center;
+                `;
+                
+                const indicator = document.createElement('div');
+                indicator.style.cssText = `
+                    width: 100px; height: 100px; border-radius: 50%; 
+                    background: #ef4444; margin-bottom: 20px; animation: pulse 1s infinite;
+                `;
+                
+                const recordBtn = document.createElement('button');
+                recordBtn.textContent = 'Start Recording';
+                recordBtn.className = 'btn btn-primary';
+                recordBtn.style.marginRight = '10px';
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.className = 'btn btn-secondary';
+                
+                modal.appendChild(indicator);
+                const buttonContainer = document.createElement('div');
+                buttonContainer.appendChild(recordBtn);
+                buttonContainer.appendChild(cancelBtn);
+                modal.appendChild(buttonContainer);
+                document.body.appendChild(modal);
+                
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const file = new File([blob], `voice-recording-${Date.now()}.webm`, { type: 'audio/webm' });
+                    handleCameraCapture(file, false);
+                };
+                
+                recordBtn.onclick = () => {
+                    if (!isRecording) {
+                        mediaRecorder.start();
+                        recordBtn.textContent = 'Stop Recording';
+                        recordBtn.className = 'btn btn-leave';
+                        isRecording = true;
+                    } else {
+                        mediaRecorder.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(modal);
+                    }
+                };
+                
+                cancelBtn.onclick = () => {
+                    if (isRecording) mediaRecorder.stop();
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(modal);
+                };
+                
+            } catch (error) {
+                showStatus('Microphone access denied or not available', 'error');
+            }
+        }
+
+        function handleCameraCapture(file, isCamera) {
+            const loadingMessage = showLoadingMessage(file.name, file.type, true);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const fileData = {
+                    fileName: file.name,
+                    fileType: file.type,
+                    fileSize: file.size,
+                    fileData: e.target.result,
+                    fromCamera: isCamera
+                };
+
+                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
+                    window.currentWebSocket.send(JSON.stringify({
+                        type: 'file-start',
+                        roomId: currentRoomId,
+                        clientId: clientId,
+                        fileName: file.name,
+                        fileType: file.type,
+                        fileSize: file.size,
+                        fromCamera: isCamera,
+                        timestamp: Date.now()
+                    }));
+
+                    setTimeout(() => {
+                        window.currentWebSocket.send(JSON.stringify({
+                            type: 'file-chunk',
+                            roomId: currentRoomId,
+                            clientId: clientId,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileSize: file.size,
+                            chunkData: e.target.result,
+                            fromCamera: isCamera,
+                            timestamp: Date.now()
+                        }));
+
+                        setTimeout(() => {
+                            loadingMessage.remove();
+                            addMessageToChat('You', '', true, true, fileData);
+                            showStatus('Media sent successfully!', 'success');
+                        }, 300);
+                    }, 200);
+                } else {
+                    loadingMessage.remove();
+                    showStatus('Not connected to room. Please try reconnecting.', 'error');
+                }
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        function leaveRoom() {
+            if (window.currentWebSocket) {
+                window.currentWebSocket.close();
+                window.currentWebSocket = null;
+            }
+            currentRoomId = null;
+            goHome();
+        }
+
+        function showJoinRoom() {
+            showScreen('joinScreen');
+            document.getElementById('roomInput').focus();
+        }
+
+        function goHome() {
+            showScreen('homeScreen');
+            currentRoomId = null;
+            clearStatus();
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.app > div').forEach(div => {
+                if (div.id && div.id.endsWith('Screen')) {
+                    div.classList.add('hidden');
+                }
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function clearStatus() {
+            document.getElementById('status').innerHTML = '';
+        }
+
+        // Format room code input
+        document.getElementById('roomInput').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        });
+
+        // Add Enter key support for message input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            document.getElementById('roomInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    joinRoom();
+                }
+            });
+        });
+    </script>
+    
+    <!-- PWA registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+    
+    <!-- iOS viewport fix -->
+    <script>
+      // Fix iOS viewport height issue
+      function setViewportHeight() {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
+      
+      setViewportHeight();
+      window.addEventListener('resize', setViewportHeight);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(setViewportHeight, 100);
+      });
+    </script>
   </body>
 </html>
