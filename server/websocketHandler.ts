@@ -95,6 +95,7 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
             }
             break;
             
+          case 'file-start':
           case 'file-offer':
           case 'file-chunk':
           case 'file-complete':

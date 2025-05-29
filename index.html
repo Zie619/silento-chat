@@ -440,23 +440,30 @@
                         addMessageToChat('Anonymous', message.message);
                     }
                     break;
-                case 'file-chunk':
-                    // Received file from another user
+                case 'file-start':
+                    // Someone started sending a file - show loading immediately
                     if (message.clientId !== clientId) {
-                        // Show loading message first
                         const loadingMessage = showLoadingMessage(message.fileName, message.fileType, false);
+                        // Store the loading message for later removal
+                        window.currentLoadingMessage = loadingMessage;
+                    }
+                    break;
+                case 'file-chunk':
+                    // Received actual file data from another user
+                    if (message.clientId !== clientId) {
+                        const fileData = {
+                            fileName: message.fileName,
+                            fileType: message.fileType,
+                            fileSize: message.fileSize,
+                            fileData: message.chunkData
+                        };
                         
-                        // Simulate processing time and then show the actual file
-                        setTimeout(() => {
-                            const fileData = {
-                                fileName: message.fileName,
-                                fileType: message.fileType,
-                                fileSize: message.fileSize,
-                                fileData: message.chunkData
-                            };
-                            loadingMessage.remove();
-                            addMessageToChat('Anonymous', '', false, true, fileData);
-                        }, 800); // Slightly longer delay for received files to show loading
+                        // Remove the loading message and show the actual file
+                        if (window.currentLoadingMessage) {
+                            window.currentLoadingMessage.remove();
+                            window.currentLoadingMessage = null;
+                        }
+                        addMessageToChat('Anonymous', '', false, true, fileData);
                     }
                     break;
                 case 'error':
@@ -624,24 +631,37 @@
                 };
 
                 if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                    // Send file via WebSocket immediately
+                    // First, notify others that a file is being sent
                     window.currentWebSocket.send(JSON.stringify({
-                        type: 'file-chunk',
+                        type: 'file-start',
                         roomId: currentRoomId,
                         clientId: clientId,
                         fileName: file.name,
                         fileType: file.type,
                         fileSize: file.size,
-                        chunkData: e.target.result,
                         timestamp: Date.now()
                     }));
 
-                    // Replace loading message with actual file
+                    // Then send the actual file data
                     setTimeout(() => {
-                        loadingMessage.remove();
-                        addMessageToChat('You', '', true, true, fileData);
-                        showStatus('File sent successfully!', 'success');
-                    }, 500); // Small delay to show loading
+                        window.currentWebSocket.send(JSON.stringify({
+                            type: 'file-chunk',
+                            roomId: currentRoomId,
+                            clientId: clientId,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileSize: file.size,
+                            chunkData: e.target.result,
+                            timestamp: Date.now()
+                        }));
+
+                        // Replace loading message with actual file
+                        setTimeout(() => {
+                            loadingMessage.remove();
+                            addMessageToChat('You', '', true, true, fileData);
+                            showStatus('File sent successfully!', 'success');
+                        }, 300); // Small delay to show loading
+                    }, 200); // Brief delay to ensure file-start arrives first
                 } else {
                     loadingMessage.remove();
                     showStatus('Not connected to room. Please try reconnecting.', 'error');
