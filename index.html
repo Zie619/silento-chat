@@ -675,6 +675,7 @@
         // Check subscription status on page load
         document.addEventListener('DOMContentLoaded', function() {
             initializeStripe();
+            showScreen('homeScreen'); // Show home screen by default
             if (hasSubscription) {
                 hideRemoveAdsButton();
             }
