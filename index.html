@@ -655,17 +655,18 @@
         let elements = null;
         let paymentElement = null;
 
-        // Initialize Stripe
-        if (window.Stripe) {
-            // We'll set this dynamically after getting the key from server
-            initializeStripe();
-        }
-
+        // Initialize Stripe after page loads
         async function initializeStripe() {
             try {
+                if (!window.Stripe) {
+                    console.error('Stripe library not loaded');
+                    return;
+                }
+                
                 const response = await fetch('/api/stripe-config');
                 const { publicKey } = await response.json();
                 stripe = Stripe(publicKey);
+                console.log('Stripe initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize Stripe:', error);
             }
@@ -673,6 +674,7 @@
 
         // Check subscription status on page load
         document.addEventListener('DOMContentLoaded', function() {
+            initializeStripe();
             if (hasSubscription) {
                 hideRemoveAdsButton();
             }
@@ -680,19 +682,15 @@
 
         async function createRoom() {
             try {
-                // Show ad if user doesn't have subscription, but let them continue
-                if (!hasSubscription) {
-                    showSimpleAd();
-                    // Continue with room creation after showing ad
-                    setTimeout(() => {
-                        closeSimpleAd();
-                        proceedWithRoomCreation();
-                    }, 3000); // Show ad for 3 seconds
-                    return;
-                }
-                
-                // Proceed with room creation immediately if subscribed
+                // Always proceed with room creation first
                 await proceedWithRoomCreation();
+                
+                // Show ad after room creation if user doesn't have subscription
+                if (!hasSubscription) {
+                    setTimeout(() => {
+                        showSimpleAd();
+                    }, 500); // Small delay to show room creation first
+                }
                 
             } catch (error) {
                 showStatus('Error creating room: ' + error.message, 'error');
@@ -746,7 +744,6 @@
                 if (seconds <= 0) {
                     clearInterval(countdown);
                     closeSimpleAd();
-                    proceedWithRoomCreation();
                 }
             }, 1000);
         }
