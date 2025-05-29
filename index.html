@@ -368,6 +368,16 @@
         }
 
         function connectToRoom(roomId) {
+            currentRoomId = roomId;
+            
+            // Clear previous chat history when joining a new room
+            const messagesArea = document.getElementById('messages');
+            messagesArea.innerHTML = `
+                <div class="welcome-message" style="text-align: center; color: #888; padding: 20px; font-style: italic;">
+                    Welcome to room ${roomId}! Share this code with others to invite them.
+                </div>
+            `;
+            
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const wsUrl = `${protocol}//${window.location.host}/ws`;
             
@@ -463,7 +473,10 @@
                 
                 // Add message to local chat
                 addMessageToChat('You', messageText, true);
+                
+                // Clear input and refocus for next message
                 messageInput.value = '';
+                messageInput.focus();
             } else {
                 showStatus('Not connected to room. Please try reconnecting.', 'error');
             }
@@ -532,6 +545,8 @@
             // Check file size (limit to 10MB for demo)
             if (file.size > 10 * 1024 * 1024) {
                 showStatus('File too large. Maximum size is 10MB.', 'error');
+                // Reset file input
+                event.target.value = '';
                 return;
             }
 
@@ -545,7 +560,7 @@
                 };
 
                 if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                    // Send file via WebSocket
+                    // Send file via WebSocket immediately
                     window.currentWebSocket.send(JSON.stringify({
                         type: 'file-chunk',
                         roomId: currentRoomId,
@@ -559,10 +574,20 @@
 
                     // Add file to local chat
                     addMessageToChat('You', '', true, true, fileData);
+                    showStatus('File sent successfully!', 'success');
                 } else {
                     showStatus('Not connected to room. Please try reconnecting.', 'error');
                 }
+                
+                // Reset file input for next file
+                event.target.value = '';
             };
+            
+            reader.onerror = function() {
+                showStatus('Error reading file. Please try again.', 'error');
+                event.target.value = '';
+            };
+            
             reader.readAsDataURL(file);
         }
 
