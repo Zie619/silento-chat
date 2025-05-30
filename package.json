@@ -8,10 +8,10 @@
     "server": "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts",
     "client": "vite",
     "build": "vite build && npm run build:server",
-    "build:server": "cd server && tsc",
+    "build:server": "cd server && tsc -p tsconfig.json",
     "build:frontend": "vite build",
     "start": "cd server && node --loader ts-node/esm --experimental-specifier-resolution=node index.ts",
-    "start:prod": "NODE_ENV=production npm start",
+    "start:prod": "NODE_ENV=production node dist/server/index.js",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
