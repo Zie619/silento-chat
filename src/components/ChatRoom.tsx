@@ -112,57 +112,70 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
   };
 
   return (
-    <div className="chat-room">
+    <div className="chat-screen ios-fade-in">
       <div className="chat-header">
-        <div className="chat-header-info">
-          <h2>Room {roomId}</h2>
-          <div className="connection-status">
-            <div className={`status-indicator ${isConnected ? 'connected' : 'connecting'}`}></div>
-            {getConnectionStatus()}
+        <div className="chat-header-content">
+          <div className="room-info">
+            <h2>Room {roomId}</h2>
+            <div className="status-indicator">
+              {isConnected ? '🟢' : '🟡'} {getConnectionStatus()}
+            </div>
           </div>
-        </div>
-        
-        <div className="chat-header-actions">
-          <button 
-            className="icon-button"
-            onClick={() => setShowPeerList(true)}
-            title="View peers"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            {peers.length > 0 && <span className="peer-count">{peers.length}</span>}
-          </button>
           
-          <button 
-            className="icon-button"
-            onClick={() => setShowFileUpload(true)}
-            title="Share file"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-            </svg>
-          </button>
-          
-          <button 
-            className="icon-button leave-button"
-            onClick={handleLeave}
-            title="Leave room"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16,17 21,12 16,7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-          </button>
+          <div style={{ display: 'flex', gap: 'var(--ios-spacing-sm)', alignItems: 'center' }}>
+            <button 
+              className="secondary-button"
+              onClick={() => setShowPeerList(true)}
+              title="View peers"
+              style={{ 
+                padding: 'var(--ios-spacing-sm)', 
+                minHeight: 'auto',
+                fontSize: 'var(--ios-font-size-caption1)'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {peers.length > 0 && <span>{peers.length}</span>}
+            </button>
+            
+            <button 
+              className="secondary-button"
+              onClick={() => setShowFileUpload(true)}
+              title="Share file"
+              style={{ 
+                padding: 'var(--ios-spacing-sm)', 
+                minHeight: 'auto' 
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+            </button>
+            
+            <button 
+              className="btn-leave"
+              onClick={handleLeave}
+              title="Leave room"
+            >
+              Leave
+            </button>
+          </div>
         </div>
       </div>
 
       {(webrtcError || transferError) && (
-        <div className="error-banner">
+        <div className="ios-status-error" style={{ 
+          margin: 'var(--ios-spacing-md)',
+          padding: 'var(--ios-spacing-md)',
+          borderRadius: 'var(--ios-radius-lg)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--ios-spacing-sm)'
+        }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="15" y1="9" x2="9" y2="15"/>
@@ -172,20 +185,24 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
         </div>
       )}
 
-      <div className="chat-content">
-        <MessageList messages={messages || []} currentUserId={clientId} />
-        <div ref={messagesEndRef} />
-      </div>
-
-      {activeTransfers.length > 0 && (
-        <div className="file-transfers">
-          {activeTransfers.map(transfer => (
-            <FileTransferProgress key={transfer.id} transfer={transfer} />
-          ))}
+      <div className="chat-container">
+        <div className="messages-area">
+          <MessageList messages={messages || []} currentUserId={clientId} />
+          <div ref={messagesEndRef} />
         </div>
-      )}
 
-      <MessageInput onSendMessage={handleSendMessage} disabled={!isConnected} />
+        {activeTransfers.length > 0 && (
+          <div style={{ padding: 'var(--ios-spacing-md)' }}>
+            {activeTransfers.map(transfer => (
+              <FileTransferProgress key={transfer.id} transfer={transfer} />
+            ))}
+          </div>
+        )}
+
+        <div className="input-container">
+          <MessageInput onSendMessage={handleSendMessage} disabled={!isConnected} />
+        </div>
+      </div>
 
       {showPeerList && (
         <PeerList 

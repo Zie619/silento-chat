@@ -10,6 +10,27 @@ interface RoomInfo {
   clientId: string;
 }
 
+// SVG Logo Component
+const SilentoLogo = () => (
+  <svg width="300" height="90" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+    <style>
+      {`
+        .glow {
+          font-family: Arial, sans-serif;
+          font-weight: bold;
+          font-size: 64px;
+          fill: #B9F8FF;
+          text-anchor: middle;
+          dominant-baseline: middle;
+          filter: drop-shadow(0 0 8px #B9F8FF) drop-shadow(0 0 12px #00E0FF);
+        }
+      `}
+    </style>
+    <rect width="100%" height="100%" fill="none"/>
+    <text x="200" y="60" className="glow">Silento</text>
+  </svg>
+);
+
 function App() {
   const [state, setState] = useState<AppState>('home');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
@@ -59,7 +80,7 @@ function App() {
           <div className="home-screen ios-fade-in">
             <div className="home-content">
               <div className="app-header">
-                <h1>Silento</h1>
+                <SilentoLogo />
                 <p>Anonymous ephemeral messaging</p>
               </div>
               

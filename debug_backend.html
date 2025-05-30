@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #1a1a1a; 
+            color: white; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background: #28a745; }
+        .error { background: #dc3545; }
+        .info { background: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>Silento Backend Test</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testBackend() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="status info">Testing backend connection...</div>';
+            
+            try {
+                const response = await fetch('https://silento-backend.onrender.com');
+                const text = await response.text();
+                
+                results.innerHTML = `
+                    <div class="status success">✅ Backend is reachable!</div>
+                    <div class="status info">Status: ${response.status}</div>
+                    <div class="status info">Response: ${text}</div>
+                `;
+                
+                // Check if it's serving HTML (frontend) or JSON (API)
+                if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+                    results.innerHTML += '<div class="status success">✅ Backend is serving HTML frontend</div>';
+                } else {
+                    results.innerHTML += '<div class="status error">❌ Backend is serving API responses, not frontend HTML</div>';
+                    results.innerHTML += '<div class="status info">💡 The backend needs to serve the React app at the root URL</div>';
+                }
+                
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="status error">❌ Failed to connect to backend</div>
+                    <div class="status error">Error: ${error.message}</div>
+                `;
+            }
+        }
+        
+        testBackend();
+    </script>
+</body>
+</html> 

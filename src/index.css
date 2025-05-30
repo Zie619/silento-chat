@@ -154,6 +154,19 @@ body {
   text-align: center;
 }
 
+.app-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--ios-spacing-2xl);
+}
+
+.app-header svg {
+  margin-bottom: var(--ios-spacing-md);
+  max-width: 100%;
+  height: auto;
+}
+
 .app-header h1 {
   font-size: var(--ios-font-size-large-title);
   font-weight: 700;
@@ -166,7 +179,7 @@ body {
   font-size: var(--ios-font-size-title3);
   font-weight: 400;
   color: var(--ios-label-secondary);
-  margin-bottom: var(--ios-spacing-2xl);
+  margin-bottom: 0;
 }
 
 .home-actions {
@@ -266,6 +279,365 @@ body {
   background: var(--ios-fill);
 }
 
+/* Room Screen Styles */
+.room-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ios-background-grouped);
+}
+
+.room-header {
+  display: flex;
+  align-items: center;
+  padding: var(--ios-spacing-lg) var(--ios-spacing-xl);
+  background: var(--ios-background-secondary);
+  border-bottom: 1px solid var(--ios-separator);
+  position: relative;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: var(--ios-system-blue);
+  cursor: pointer;
+  padding: var(--ios-spacing-sm);
+  border-radius: var(--ios-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--ios-spacing-xs);
+  font-size: var(--ios-font-size-callout);
+  transition: all var(--ios-transition-fast);
+  margin-right: var(--ios-spacing-md);
+}
+
+.back-button:hover {
+  background: var(--ios-fill);
+}
+
+.room-header h2 {
+  font-size: var(--ios-font-size-headline);
+  font-weight: 600;
+  color: var(--ios-label);
+  flex: 1;
+  text-align: center;
+  margin-right: 60px; /* Account for back button */
+}
+
+.room-content {
+  flex: 1;
+  padding: var(--ios-spacing-xl);
+  overflow-y: auto;
+}
+
+.create-room-info {
+  text-align: center;
+  margin-bottom: var(--ios-spacing-2xl);
+}
+
+.info-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--ios-system-blue);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--ios-spacing-lg);
+  color: white;
+}
+
+.create-room-info h3 {
+  font-size: var(--ios-font-size-title2);
+  font-weight: 600;
+  color: var(--ios-label);
+  margin-bottom: var(--ios-spacing-sm);
+}
+
+.create-room-info p {
+  font-size: var(--ios-font-size-callout);
+  color: var(--ios-label-secondary);
+  line-height: 1.4;
+}
+
+.room-actions {
+  margin-bottom: var(--ios-spacing-2xl);
+}
+
+.room-actions .primary-button {
+  width: 100%;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.error-message {
+  background: var(--ios-system-red);
+  color: white;
+  padding: var(--ios-spacing-md);
+  border-radius: var(--ios-radius-lg);
+  margin-bottom: var(--ios-spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--ios-spacing-sm);
+  font-size: var(--ios-font-size-callout);
+}
+
+.room-features {
+  background: var(--ios-background-secondary);
+  border-radius: var(--ios-radius-xl);
+  padding: var(--ios-spacing-xl);
+  border: 1px solid var(--ios-separator);
+}
+
+.room-features h4 {
+  font-size: var(--ios-font-size-headline);
+  font-weight: 600;
+  color: var(--ios-label);
+  margin-bottom: var(--ios-spacing-lg);
+}
+
+.room-features ul {
+  list-style: none;
+  padding: 0;
+}
+
+.room-features li {
+  display: flex;
+  align-items: center;
+  gap: var(--ios-spacing-md);
+  margin-bottom: var(--ios-spacing-md);
+  font-size: var(--ios-font-size-callout);
+  color: var(--ios-label-secondary);
+}
+
+.room-features li:last-child {
+  margin-bottom: 0;
+}
+
+.room-features li svg {
+  color: var(--ios-system-green);
+  flex-shrink: 0;
+}
+
+/* Chat Room Styles */
+.chat-screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ios-background-grouped);
+}
+
+.chat-header {
+  background: var(--ios-background-secondary);
+  border-bottom: 1px solid var(--ios-separator);
+  padding: var(--ios-spacing-lg) var(--ios-spacing-xl);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.chat-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-info h2 {
+  margin: 0;
+  font-size: var(--ios-font-size-headline);
+  font-weight: 600;
+  color: var(--ios-label);
+}
+
+.status-indicator {
+  font-size: var(--ios-font-size-caption1);
+  margin-top: 2px;
+  opacity: 0.8;
+  color: var(--ios-system-green);
+}
+
+.btn-leave {
+  background: rgba(255, 69, 58, 0.1);
+  color: var(--ios-system-red);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  padding: var(--ios-spacing-sm) var(--ios-spacing-md);
+  font-size: var(--ios-font-size-footnote);
+  border-radius: var(--ios-radius-md);
+  cursor: pointer;
+  transition: all var(--ios-transition-fast);
+}
+
+.btn-leave:hover {
+  background: rgba(255, 69, 58, 0.2);
+}
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages-area {
+  flex: 1;
+  background: var(--ios-background-grouped);
+  padding: var(--ios-spacing-lg);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.welcome-message {
+  text-align: center;
+  color: var(--ios-label-tertiary);
+  padding: var(--ios-spacing-2xl) var(--ios-spacing-lg);
+  font-style: italic;
+}
+
+.message {
+  margin: var(--ios-spacing-sm) 0;
+  padding: var(--ios-spacing-md);
+  border-radius: var(--ios-radius-lg);
+  background: var(--ios-background-secondary);
+  border: 1px solid var(--ios-separator);
+  word-wrap: break-word;
+}
+
+.message.own {
+  background: var(--ios-system-blue);
+  color: white;
+  margin-left: auto;
+  max-width: 80%;
+  border-color: var(--ios-system-blue);
+}
+
+.message.other {
+  background: var(--ios-background-secondary);
+  color: var(--ios-label);
+  margin-right: auto;
+  max-width: 80%;
+}
+
+.message-sender {
+  font-weight: 600;
+  font-size: var(--ios-font-size-caption1);
+  margin-bottom: var(--ios-spacing-xs);
+  opacity: 0.8;
+}
+
+.message-content {
+  font-size: var(--ios-font-size-callout);
+}
+
+.message-time {
+  font-size: var(--ios-font-size-caption2);
+  opacity: 0.6;
+  margin-top: var(--ios-spacing-xs);
+}
+
+.input-container {
+  padding: var(--ios-spacing-lg);
+  background: var(--ios-background-secondary);
+  border-top: 1px solid var(--ios-separator);
+}
+
+.text-input-area {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.message-input {
+  flex: 1;
+  margin: 0;
+  background: transparent;
+  border: none;
+  padding: 12px 16px;
+  color: white;
+  font-size: var(--ios-font-size-callout);
+  font-family: var(--ios-font-family);
+}
+
+.message-input:focus {
+  outline: none;
+  background: transparent;
+}
+
+.message-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-send {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.media-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--ios-spacing-sm);
+}
+
+.btn-media-action {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: white;
+}
+
+.btn-media-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-media-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-media-action span {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 /* iOS-style inputs */
 .ios-input {
   width: 100%;
@@ -298,6 +670,10 @@ body {
   padding: var(--ios-spacing-md) var(--ios-spacing-lg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ios-nav-title {

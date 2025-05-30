@@ -9,9 +9,10 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     private var errorLabel: UILabel!
     
     private var urlsToTry = [
-        "http://172.20.10.2:3000",      // Network IP (for iOS simulator)
-        "http://localhost:3000",         // Localhost (for iOS device)
-        "https://silento-backend.onrender.com"  // Live server (fallback)
+        "https://silento-backend.onrender.com",  // Your hosted backend
+        "http://192.168.68.52:3000",      // Current network IP (fallback for development)
+        "http://172.20.10.2:3000",       // Previous network IP (fallback for development) 
+        "http://localhost:3000",         // Localhost (fallback for development)
     ]
     private var currentUrlIndex = 0
     

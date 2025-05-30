@@ -3,11 +3,11 @@ services:
     name: silento-backend
     env: node
     plan: free
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-    autoDeploy: false
+    autoDeploy: true
     rootDir: . 

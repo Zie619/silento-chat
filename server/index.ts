@@ -1,10 +1,16 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { setupRoutes } from './routes.js';
 
 const app = express();
 const server = http.createServer(app);
+
+// Get directory paths for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Environment configuration
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -15,7 +21,7 @@ const corsOptions = {
   origin: isDevelopment 
     ? ['http://localhost:3000', 'http://127.0.0.1:3000']
     : [
-        'https://your-frontend-domain.com', // Replace with your actual frontend domain
+        'https://silento-backend.onrender.com', // Your actual backend domain
         /^https:\/\/.*\.railway\.app$/, // Allow Railway preview deployments
         /^https:\/\/.*\.vercel\.app$/, // Allow Vercel deployments
         /^https:\/\/.*\.netlify\.app$/, // Allow Netlify deployments
@@ -29,6 +35,13 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Serve static files from React build (production only)
+if (!isDevelopment) {
+  const buildPath = path.join(__dirname, '..', 'dist');
+  console.log(`Serving static files from: ${buildPath}`);
+  app.use(express.static(buildPath));
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -62,13 +75,25 @@ app.use((req: any, res: any, next: any) => {
   next();
 });
 
-// Setup routes and WebSocket
+// Setup API routes and WebSocket
 setupRoutes(app, server);
+
+// Serve React app for all non-API routes (production only)
+if (!isDevelopment) {
+  app.get('*', (req, res) => {
+    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
+    console.log(`Serving React app from: ${indexPath}`);
+    res.sendFile(indexPath);
+  });
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+  if (!isDevelopment) {
+    console.log(`Frontend served from: ${path.join(__dirname, '..', 'dist')}`);
+  }
 });
 
 // Cleanup interval for rate limiting

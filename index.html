@@ -6,7 +6,9 @@
     <title>Silento</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="apple-mobile-web-app-title" content="Silento">
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -311,880 +313,97 @@
         .loading-message {
             opacity: 0.8;
         }
+        
+        /* Splash screen styles */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.5s ease-out;
+        }
+        
+        #splash-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        #splash-screen img {
+            max-width: 200px;
+            max-height: 200px;
+            width: auto;
+            height: auto;
+        }
+        
+        /* Ensure the root element is ready */
+        #root {
+            opacity: 0;
+            transition: opacity 0.3s ease-in;
+        }
+        
+        #root.loaded {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
-    <div class="app">
-        <div id="homeScreen">
-            <div class="header">
-                <h1>Silento</h1>
-                <p>Anonymous ephemeral messaging</p>
-            </div>
-            
-            <div class="actions">
-                <button class="btn btn-primary" onclick="createRoom()">
-                    Create Room
-                </button>
-                <button class="btn btn-secondary" onclick="showJoinRoom()">
-                    Join Room
-                </button>
-            </div>
-            
-            <div class="footer">
-                <p>No registration required • No data stored • Completely anonymous</p>
-            </div>
-        </div>
-        
-        <div id="createScreen" class="hidden">
-            <div class="header">
-                <h1>Room Created!</h1>
-            </div>
-            
-            <div class="room-info">
-                <p>Share this code with others:</p>
-                <div class="room-code" id="roomCode">------</div>
-                <p>Others can join using this 6-character code</p>
-            </div>
-            
-            <div class="actions">
-                <button class="btn btn-primary" onclick="startChat()">
-                    Start Chatting
-                </button>
-                <button class="btn btn-secondary" onclick="goHome()">
-                    Back to Home
-                </button>
-            </div>
-        </div>
-        
-        <div id="joinScreen" class="hidden">
-            <div class="header">
-                <h1>Join Room</h1>
-                <p>Enter the 6-character room code</p>
-            </div>
-            
-            <div class="actions">
-                <input type="text" class="input" id="roomInput" placeholder="Enter room code" maxlength="6">
-                <button class="btn btn-primary" onclick="joinRoom()">
-                    Join Room
-                </button>
-                <button class="btn btn-secondary" onclick="goHome()">
-                    Back
-                </button>
-            </div>
-        </div>
-
-        <div id="chatScreen" class="hidden">
-            <div class="chat-header">
-                <div class="chat-header-content">
-                    <div class="room-info">
-                        <h2>Room <span id="currentRoomDisplay">------</span></h2>
-                        <div class="status-indicator">🟢 Connected</div>
-                    </div>
-                    <button class="btn btn-leave" onclick="leaveRoom()">Leave</button>
-                </div>
-            </div>
-            
-            <div class="chat-container">
-                <div id="messages" class="messages-area">
-                    <div class="welcome-message">
-                        <p>Welcome to Silento!</p>
-                        <p>Share this room code with others to start chatting...</p>
-                    </div>
-                </div>
-                
-                <div class="input-container">
-                    <div class="text-input-area">
-                        <input type="text" class="input message-input" id="messageInput" placeholder="Type your message..." maxlength="500">
-                        <button class="btn btn-send" onclick="sendMessage()">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="media-actions">
-                        <input type="file" id="fileInput" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.7z" style="display: none;" onchange="handleFileSelect(event)">
-                        <button class="btn btn-media-action" onclick="document.getElementById('fileInput').click()" title="Upload file">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"></path>
-                            </svg>
-                            <span>Files</span>
-                        </button>
-                        <button class="btn btn-media-action" onclick="capturePhoto()" title="Take photo">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                <circle cx="12" cy="13" r="4"></circle>
-                            </svg>
-                            <span>Photo</span>
-                        </button>
-                        <button class="btn btn-media-action" onclick="recordVideo()" title="Record video">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="23,7 16,12 23,17"></polygon>
-                                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-                            </svg>
-                            <span>Video</span>
-                        </button>
-                        <button class="btn btn-media-action" onclick="recordVoice()" title="Record voice">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                                <line x1="12" y1="19" x2="12" y2="23"></line>
-                                <line x1="8" y1="23" x2="16" y2="23"></line>
-                            </svg>
-                            <span>Voice</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div id="status"></div>
+    <!-- Splash Screen -->
+    <div id="splash-screen">
+        <img src="/splash.png" alt="Silento" />
     </div>
-
+    
+    <!-- React App Root -->
+    <div id="root"></div>
+    
+    <script type="module" src="/src/main.tsx"></script>
+    
     <script>
-        let currentRoomId = null;
-        let clientId = 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-
-        async function createRoom() {
-            try {
-                showStatus('Creating room...', 'info');
-                
-                const response = await fetch('/api/create-room', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to create room');
-                }
-                
-                const data = await response.json();
-                currentRoomId = data.roomId;
-                
-                document.getElementById('roomCode').textContent = data.roomId;
-                showScreen('createScreen');
-                showStatus('Room created successfully!', 'success');
-                
-            } catch (error) {
-                showStatus('Error creating room: ' + error.message, 'error');
-            }
-        }
-
-        async function joinRoom() {
-            const roomId = document.getElementById('roomInput').value.toUpperCase();
-            
-            if (!roomId || roomId.length !== 6) {
-                showStatus('Please enter a valid 6-character room code', 'error');
-                return;
-            }
-            
-            try {
-                showStatus('Checking room...', 'info');
-                
-                // First check if room exists
-                const statusResponse = await fetch(`/api/room/${roomId}/status`);
-                
-                if (!statusResponse.ok) {
-                    showStatus('Room not found or has expired', 'error');
-                    return;
-                }
-                
-                const roomStatus = await statusResponse.json();
-                
-                // Now join the room
-                const response = await fetch('/api/join-room', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ roomId, clientId })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to join room');
-                }
-                
-                currentRoomId = roomId;
-                showStatus(`Joining room with ${roomStatus.peerCount} peer(s)...`, 'success');
-                startChat();
-                
-            } catch (error) {
-                showStatus('Error joining room: ' + error.message, 'error');
-            }
-        }
-
-        function startChat() {
-            if (currentRoomId) {
-                // Initialize WebSocket connection for real-time chat
-                connectToRoom(currentRoomId);
-                showChatInterface();
-            }
-        }
-
-        function connectToRoom(roomId) {
-            currentRoomId = roomId;
-            
-            // Clear previous chat history when joining a new room
-            const messagesArea = document.getElementById('messages');
-            messagesArea.innerHTML = `
-                <div class="welcome-message" style="text-align: center; color: #888; padding: 20px; font-style: italic;">
-                    Welcome to room ${roomId}! Share this code with others to invite them.
-                </div>
-            `;
-            
-            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
-            
-            const ws = new WebSocket(wsUrl);
-            
-            ws.onopen = () => {
-                console.log('WebSocket connected');
-                // Initialize connection with room and client info
-                ws.send(JSON.stringify({
-                    type: 'init',
-                    roomId: roomId,
-                    clientId: clientId
-                }));
-                showStatus('Connected to room: ' + roomId, 'success');
-            };
-            
-            ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                handleWebSocketMessage(message);
-            };
-            
-            ws.onerror = (error) => {
-                console.log('WebSocket error:', error);
-                showStatus('Connection error. Please try again.', 'error');
-            };
-            
-            ws.onclose = () => {
-                console.log('WebSocket disconnected');
-                showStatus('Disconnected from room', 'error');
-            };
-            
-            window.currentWebSocket = ws;
-        }
-
-        function handleWebSocketMessage(message) {
-            switch (message.type) {
-                case 'init-success':
-                    showStatus(`Connected! ${message.peers ? message.peers.length : 0} other(s) in room`, 'success');
-                    break;
-                case 'peer-joined':
-                    showStatus(`Someone joined the room!`, 'success');
-                    addMessageToChat('System', 'A new person joined the chat');
-                    break;
-                case 'peer-left':
-                    showStatus(`Someone left the room`, 'info');
-                    addMessageToChat('System', 'Someone left the chat');
-                    break;
-                case 'message':
-                    // Received message from another user
-                    if (message.clientId !== clientId) {
-                        addMessageToChat('Anonymous', message.message);
-                    }
-                    break;
-                case 'file-start':
-                    // Someone started sending a file - show loading immediately
-                    console.log('Received file-start message:', message);
-                    if (message.clientId !== clientId) {
-                        console.log('Showing loading message for:', message.fileName);
-                        const loadingMessage = showLoadingMessage(message.fileName, message.fileType, false);
-                        // Store the loading message for later removal
-                        window.currentLoadingMessage = loadingMessage;
-                    }
-                    break;
-                case 'file-chunk':
-                    // Received actual file data from another user
-                    if (message.clientId !== clientId) {
-                        const fileData = {
-                            fileName: message.fileName,
-                            fileType: message.fileType,
-                            fileSize: message.fileSize,
-                            fileData: message.chunkData,
-                            fromCamera: message.fromCamera || false
-                        };
-                        
-                        // Remove the loading message and show the actual file
-                        if (window.currentLoadingMessage) {
-                            window.currentLoadingMessage.remove();
-                            window.currentLoadingMessage = null;
-                        }
-                        addMessageToChat('Anonymous', '', false, true, fileData);
-                    }
-                    break;
-                case 'error':
-                    showStatus('Error: ' + message.message, 'error');
-                    break;
-            }
-        }
-
-        function showChatInterface() {
-            document.getElementById('currentRoomDisplay').textContent = currentRoomId;
-            showScreen('chatScreen');
-            document.getElementById('messageInput').focus();
-        }
-
-        function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const messageText = messageInput.value.trim();
-            
-            if (!messageText) return;
-            
-            if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                // Send message via WebSocket for real-time delivery
-                window.currentWebSocket.send(JSON.stringify({
-                    type: 'message',
-                    roomId: currentRoomId,
-                    clientId: clientId,
-                    message: messageText,
-                    timestamp: Date.now()
-                }));
-                
-                // Add message to local chat
-                addMessageToChat('You', messageText, true);
-                
-                // Clear input and refocus for next message
-                messageInput.value = '';
-                messageInput.focus();
-            } else {
-                showStatus('Not connected to room. Please try reconnecting.', 'error');
-            }
-        }
-
-        function addMessageToChat(sender, message, isOwnMessage = false, isFile = false, fileData = null) {
-            const messagesArea = document.getElementById('messages');
-            const welcomeMessage = messagesArea.querySelector('.welcome-message');
-            
-            // Remove welcome message on first real message
-            if (welcomeMessage && sender !== 'System') {
-                welcomeMessage.remove();
-            }
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            
-            let content;
-            if (isFile && fileData) {
-                const cameraIndicator = fileData.fromCamera ? 
-                    '<svg class="camera-indicator" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; margin-left: 8px; color: #10b981;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>' : '';
-                
-                if (fileData.fileType.startsWith('image/')) {
-                    content = `
-                        <strong>${sender} shared an image:</strong>${cameraIndicator}<br>
-                        <img src="${fileData.fileData}" alt="${fileData.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
-                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
-                    `;
-                } else if (fileData.fileType.startsWith('video/')) {
-                    content = `
-                        <strong>${sender} shared a video:</strong>${cameraIndicator}<br>
-                        <video controls style="max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px;">
-                            <source src="${fileData.fileData}" type="${fileData.fileType}">
-                        </video>
-                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
-                    `;
-                } else if (fileData.fileType.startsWith('audio/')) {
-                    content = `
-                        <strong>${sender} shared an audio:</strong>${cameraIndicator}<br>
-                        <audio controls style="width: 100%; margin-top: 8px;">
-                            <source src="${fileData.fileData}" type="${fileData.fileType}">
-                        </audio>
-                        <div style="font-size: 0.8em; color: #ccc; margin-top: 4px;">${fileData.fileName}</div>
-                    `;
-                } else {
-                    content = `
-                        <strong>${sender} shared a file:</strong><br>
-                        <a href="${fileData.fileData}" download="${fileData.fileName}" style="color: #667eea; text-decoration: none;">
-                            📎 ${fileData.fileName}
-                        </a>
-                    `;
-                }
-            } else {
-                content = `<strong>${sender}:</strong> ${message}`;
-            }
-            
-            messageDiv.innerHTML = `
-                ${content}
-                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
-                    ${new Date().toLocaleTimeString()}
-                </div>
-            `;
-            
-            if (isOwnMessage) {
-                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
-                messageDiv.style.borderLeftColor = '#22c55e';
-            }
-            
-            messagesArea.appendChild(messageDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-        }
-
-        function showLoadingMessage(fileName, fileType, isOwnMessage = false) {
-            const messagesArea = document.getElementById('messages');
-            const welcomeMessage = messagesArea.querySelector('.welcome-message');
-            
-            // Remove welcome message
-            if (welcomeMessage) {
-                welcomeMessage.remove();
-            }
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message loading-message';
-            
-            const sender = isOwnMessage ? 'You' : 'Anonymous';
-            const fileTypeText = fileType.startsWith('image/') ? 'image' : fileType.startsWith('video/') ? 'video' : 'file';
-            
-            messageDiv.innerHTML = `
-                <strong>${sender} ${isOwnMessage ? 'are sending' : 'is sending'} ${fileTypeText.includes('image') ? 'an' : 'a'} ${fileTypeText}:</strong><br>
-                <div style="display: flex; align-items: center; margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                    <div class="loading-spinner" style="
-                        width: 20px; 
-                        height: 20px; 
-                        border: 2px solid rgba(255,255,255,0.3);
-                        border-top: 2px solid #667eea;
-                        border-radius: 50%;
-                        animation: spin 1s linear infinite;
-                        margin-right: 10px;
-                    "></div>
-                    <span style="font-size: 0.9em; color: #ccc;">${fileName}</span>
-                </div>
-                <div style="font-size: 0.8em; color: #888; margin-top: 4px;">
-                    ${new Date().toLocaleTimeString()}
-                </div>
-            `;
-            
-            if (isOwnMessage) {
-                messageDiv.style.background = 'rgba(34, 197, 94, 0.1)';
-                messageDiv.style.borderLeftColor = '#22c55e';
-            }
-            
-            messagesArea.appendChild(messageDiv);
-            messagesArea.scrollTop = messagesArea.scrollHeight;
-            
-            return messageDiv;
-        }
-
-        function handleFileSelect(event, fromCamera = false) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            // Check file size (limit to 10MB for demo)
-            if (file.size > 10 * 1024 * 1024) {
-                showStatus('File too large. Maximum size is 10MB.', 'error');
-                // Reset file input
-                event.target.value = '';
-                return;
-            }
-
-            // Show loading message immediately
-            const loadingMessage = showLoadingMessage(file.name, file.type, true);
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const fileData = {
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileSize: file.size,
-                    fileData: e.target.result,
-                    fromCamera: fromCamera
-                };
-
-                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                    // First, notify others that a file is being sent
-                    console.log('Sending file-start message for:', file.name);
-                    window.currentWebSocket.send(JSON.stringify({
-                        type: 'file-start',
-                        roomId: currentRoomId,
-                        clientId: clientId,
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        fromCamera: fromCamera,
-                        timestamp: Date.now()
-                    }));
-
-                    // Then send the actual file data
-                    setTimeout(() => {
-                        window.currentWebSocket.send(JSON.stringify({
-                            type: 'file-chunk',
-                            roomId: currentRoomId,
-                            clientId: clientId,
-                            fileName: file.name,
-                            fileType: file.type,
-                            fileSize: file.size,
-                            chunkData: e.target.result,
-                            fromCamera: fromCamera,
-                            timestamp: Date.now()
-                        }));
-
-                        // Replace loading message with actual file
-                        setTimeout(() => {
-                            loadingMessage.remove();
-                            addMessageToChat('You', '', true, true, fileData);
-                            showStatus('File sent successfully!', 'success');
-                        }, 300); // Small delay to show loading
-                    }, 200); // Brief delay to ensure file-start arrives first
-                } else {
-                    loadingMessage.remove();
-                    showStatus('Not connected to room. Please try reconnecting.', 'error');
-                }
-                
-                // Reset file input for next file
-                event.target.value = '';
-            };
-            
-            reader.onerror = function() {
-                loadingMessage.remove();
-                showStatus('Error reading file. Please try again.', 'error');
-                event.target.value = '';
-            };
-            
-            reader.readAsDataURL(file);
-        }
-
-        async function capturePhoto() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' } 
-                });
-                
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
-                
-                // Create modal for camera preview
-                const modal = document.createElement('div');
-                modal.style.cssText = `
-                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
-                    flex-direction: column; align-items: center; justify-content: center;
-                `;
-                
-                video.style.cssText = `
-                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
-                `;
-                
-                const captureBtn = document.createElement('button');
-                captureBtn.textContent = 'Take Photo';
-                captureBtn.className = 'btn btn-primary';
-                captureBtn.style.marginRight = '10px';
-                
-                const cancelBtn = document.createElement('button');
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.className = 'btn btn-secondary';
-                
-                modal.appendChild(video);
-                const buttonContainer = document.createElement('div');
-                buttonContainer.appendChild(captureBtn);
-                buttonContainer.appendChild(cancelBtn);
-                modal.appendChild(buttonContainer);
-                document.body.appendChild(modal);
-                
-                captureBtn.onclick = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    canvas.getContext('2d').drawImage(video, 0, 0);
-                    
-                    canvas.toBlob(blob => {
-                        const file = new File([blob], `camera-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-                        handleCameraCapture(file, true);
-                    }, 'image/jpeg', 0.8);
-                    
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(modal);
-                };
-                
-                cancelBtn.onclick = () => {
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(modal);
-                };
-                
-            } catch (error) {
-                showStatus('Camera access denied or not available', 'error');
-            }
-        }
-
-        async function recordVideo() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' }, 
-                    audio: true 
-                });
-                
-                const mediaRecorder = new MediaRecorder(stream);
-                const chunks = [];
-                let isRecording = false;
-                
-                // Create modal for video recording
-                const modal = document.createElement('div');
-                modal.style.cssText = `
-                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
-                    flex-direction: column; align-items: center; justify-content: center;
-                `;
-                
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
-                video.style.cssText = `
-                    width: 90%; max-width: 400px; border-radius: 12px; margin-bottom: 20px;
-                `;
-                
-                const recordBtn = document.createElement('button');
-                recordBtn.textContent = 'Start Recording';
-                recordBtn.className = 'btn btn-primary';
-                recordBtn.style.marginRight = '10px';
-                
-                const cancelBtn = document.createElement('button');
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.className = 'btn btn-secondary';
-                
-                modal.appendChild(video);
-                const buttonContainer = document.createElement('div');
-                buttonContainer.appendChild(recordBtn);
-                buttonContainer.appendChild(cancelBtn);
-                modal.appendChild(buttonContainer);
-                document.body.appendChild(modal);
-                
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'video/webm' });
-                    const file = new File([blob], `camera-video-${Date.now()}.webm`, { type: 'video/webm' });
-                    handleCameraCapture(file, true);
-                };
-                
-                recordBtn.onclick = () => {
-                    if (!isRecording) {
-                        mediaRecorder.start();
-                        recordBtn.textContent = 'Stop Recording';
-                        recordBtn.className = 'btn btn-leave';
-                        isRecording = true;
-                    } else {
-                        mediaRecorder.stop();
-                        stream.getTracks().forEach(track => track.stop());
-                        document.body.removeChild(modal);
-                    }
-                };
-                
-                cancelBtn.onclick = () => {
-                    if (isRecording) mediaRecorder.stop();
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(modal);
-                };
-                
-            } catch (error) {
-                showStatus('Camera/microphone access denied or not available', 'error');
-            }
-        }
-
-        async function recordVoice() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mediaRecorder = new MediaRecorder(stream);
-                const chunks = [];
-                let isRecording = false;
-                
-                // Create modal for voice recording
-                const modal = document.createElement('div');
-                modal.style.cssText = `
-                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0,0,0,0.9); z-index: 1000; display: flex; 
-                    flex-direction: column; align-items: center; justify-content: center;
-                `;
-                
-                const indicator = document.createElement('div');
-                indicator.style.cssText = `
-                    width: 100px; height: 100px; border-radius: 50%; 
-                    background: #ef4444; margin-bottom: 20px; animation: pulse 1s infinite;
-                `;
-                
-                const recordBtn = document.createElement('button');
-                recordBtn.textContent = 'Start Recording';
-                recordBtn.className = 'btn btn-primary';
-                recordBtn.style.marginRight = '10px';
-                
-                const cancelBtn = document.createElement('button');
-                cancelBtn.textContent = 'Cancel';
-                cancelBtn.className = 'btn btn-secondary';
-                
-                modal.appendChild(indicator);
-                const buttonContainer = document.createElement('div');
-                buttonContainer.appendChild(recordBtn);
-                buttonContainer.appendChild(cancelBtn);
-                modal.appendChild(buttonContainer);
-                document.body.appendChild(modal);
-                
-                mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: 'audio/webm' });
-                    const file = new File([blob], `voice-recording-${Date.now()}.webm`, { type: 'audio/webm' });
-                    handleCameraCapture(file, false);
-                };
-                
-                recordBtn.onclick = () => {
-                    if (!isRecording) {
-                        mediaRecorder.start();
-                        recordBtn.textContent = 'Stop Recording';
-                        recordBtn.className = 'btn btn-leave';
-                        isRecording = true;
-                    } else {
-                        mediaRecorder.stop();
-                        stream.getTracks().forEach(track => track.stop());
-                        document.body.removeChild(modal);
-                    }
-                };
-                
-                cancelBtn.onclick = () => {
-                    if (isRecording) mediaRecorder.stop();
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(modal);
-                };
-                
-            } catch (error) {
-                showStatus('Microphone access denied or not available', 'error');
-            }
-        }
-
-        function handleCameraCapture(file, isCamera) {
-            const loadingMessage = showLoadingMessage(file.name, file.type, true);
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const fileData = {
-                    fileName: file.name,
-                    fileType: file.type,
-                    fileSize: file.size,
-                    fileData: e.target.result,
-                    fromCamera: isCamera
-                };
-
-                if (window.currentWebSocket && window.currentWebSocket.readyState === WebSocket.OPEN) {
-                    window.currentWebSocket.send(JSON.stringify({
-                        type: 'file-start',
-                        roomId: currentRoomId,
-                        clientId: clientId,
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        fromCamera: isCamera,
-                        timestamp: Date.now()
-                    }));
-
-                    setTimeout(() => {
-                        window.currentWebSocket.send(JSON.stringify({
-                            type: 'file-chunk',
-                            roomId: currentRoomId,
-                            clientId: clientId,
-                            fileName: file.name,
-                            fileType: file.type,
-                            fileSize: file.size,
-                            chunkData: e.target.result,
-                            fromCamera: isCamera,
-                            timestamp: Date.now()
-                        }));
-
-                        setTimeout(() => {
-                            loadingMessage.remove();
-                            addMessageToChat('You', '', true, true, fileData);
-                            showStatus('Media sent successfully!', 'success');
-                        }, 300);
-                    }, 200);
-                } else {
-                    loadingMessage.remove();
-                    showStatus('Not connected to room. Please try reconnecting.', 'error');
-                }
-            };
-            
-            reader.readAsDataURL(file);
-        }
-
-        function leaveRoom() {
-            if (window.currentWebSocket) {
-                window.currentWebSocket.close();
-                window.currentWebSocket = null;
-            }
-            currentRoomId = null;
-            goHome();
-        }
-
-        function showJoinRoom() {
-            showScreen('joinScreen');
-            document.getElementById('roomInput').focus();
-        }
-
-        function goHome() {
-            showScreen('homeScreen');
-            currentRoomId = null;
-            clearStatus();
-        }
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.app > div').forEach(div => {
-                if (div.id && div.id.endsWith('Screen')) {
-                    div.classList.add('hidden');
-                }
-            });
-            document.getElementById(screenId).classList.remove('hidden');
-        }
-
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
-        }
-
-        function clearStatus() {
-            document.getElementById('status').innerHTML = '';
-        }
-
-        // Format room code input
-        document.getElementById('roomInput').addEventListener('input', function(e) {
-            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        });
-
-        // Add Enter key support for message input
+        // Splash screen functionality
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
+            const splashScreen = document.getElementById('splash-screen');
+            const root = document.getElementById('root');
             
-            document.getElementById('roomInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    joinRoom();
+            // Hide splash screen after app loads
+            const hideSplash = () => {
+                setTimeout(() => {
+                    splashScreen.classList.add('fade-out');
+                    root.classList.add('loaded');
+                    setTimeout(() => {
+                        splashScreen.style.display = 'none';
+                    }, 500);
+                }, 1000); // Show splash for at least 1 second
+            };
+            
+            // Wait for React app to mount
+            const checkAppLoaded = () => {
+                if (root.children.length > 0) {
+                    hideSplash();
+                } else {
+                    setTimeout(checkAppLoaded, 100);
                 }
-            });
+            };
+            
+            // Start checking after a short delay
+            setTimeout(checkAppLoaded, 500);
+        });
+        
+        // iOS viewport height fix
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
         });
     </script>
-    
-    <!-- PWA registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
-      }
-    </script>
-    
-    <!-- iOS viewport fix -->
-    <script>
-      // Fix iOS viewport height issue
-      function setViewportHeight() {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-      }
-      
-      setViewportHeight();
-      window.addEventListener('resize', setViewportHeight);
-      window.addEventListener('orientationchange', () => {
-        setTimeout(setViewportHeight, 100);
-      });
-    </script>
-  </body>
+</body>
 </html>
