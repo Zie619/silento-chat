@@ -38,8 +38,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static files from React build (production only)
 if (!isDevelopment) {
-  const buildPath = path.join(__dirname, '..', 'dist');
+  // When running in production, the compiled server is in dist/server/
+  // and the React build is in the root dist/ folder
+  const buildPath = path.resolve(process.cwd(), 'dist');
   console.log(`Serving static files from: ${buildPath}`);
+  console.log(`Current working directory: ${process.cwd()}`);
+  console.log(`Server __dirname: ${__dirname}`);
   app.use(express.static(buildPath));
 }
 
@@ -81,7 +85,7 @@ setupRoutes(app, server);
 // Serve React app for all non-API routes (production only)
 if (!isDevelopment) {
   app.get('*', (req, res) => {
-    const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
+    const indexPath = path.resolve(process.cwd(), 'dist', 'index.html');
     console.log(`Serving React app from: ${indexPath}`);
     res.sendFile(indexPath);
   });
@@ -92,7 +96,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   if (!isDevelopment) {
-    console.log(`Frontend served from: ${path.join(__dirname, '..', 'dist')}`);
+    console.log(`Frontend served from: ${path.resolve(process.cwd(), 'dist')}`);
   }
 });
 
