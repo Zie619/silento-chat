@@ -13,7 +13,8 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
   const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const trimmedCode = roomCode.trim().toLowerCase();
+    // Keep the original case as entered by the user
+    const trimmedCode = roomCode.trim();
     if (!trimmedCode) {
       setError('Please enter a room code');
       return;
@@ -26,10 +27,14 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
       // Simulate room join delay
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Basic validation - room codes follow the pattern: word-word-word
-      const roomPattern = /^[a-z]+-[a-z]+-[a-z]+$/;
+      // More flexible validation - allow alphanumeric with hyphens
+      const roomPattern = /^[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+$/;
       if (!roomPattern.test(trimmedCode)) {
-        throw new Error('Invalid room code format');
+        // Also check if it's a simple 6-character code (legacy support)
+        const legacyPattern = /^[A-Z0-9]{6}$/;
+        if (!legacyPattern.test(trimmedCode.toUpperCase())) {
+          throw new Error('Invalid room code format');
+        }
       }
       
       onRoomJoined(trimmedCode);
@@ -63,7 +68,7 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
               setRoomCode(e.target.value);
               setError(null);
             }}
-            placeholder="e.g. swift-blue-eagle"
+            placeholder="e.g. swift-blue-eagle or ABC123"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"

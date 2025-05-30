@@ -13,6 +13,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [capturedMedia, setCapturedMedia] = useState<{file: File, preview: string, type: 'image' | 'video' | 'audio'} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,35 +111,47 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
       video.autoplay = true;
       video.playsInline = true;
       
-      video.onloadedmetadata = () => {
-        // Create canvas to capture the frame
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        
+      // Wait for video to be ready
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play().then(() => resolve());
+        };
+      });
+
+      // Wait a bit for camera to adjust
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Create canvas to capture the frame
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
         // Draw the video frame to canvas
-        context?.drawImage(video, 0, 0);
+        context.drawImage(video, 0, 0);
         
         // Convert to blob and create file
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const file = new File([blob], `photo-${timestamp}.jpg`, { type: 'image/jpeg' });
-            const previewUrl = URL.createObjectURL(blob);
-            
-            setCapturedMedia({
-              file,
-              preview: previewUrl,
-              type: 'image'
-            });
-          }
+        const blob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+        });
+        
+        if (blob) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const file = new File([blob], `photo-${timestamp}.jpg`, { type: 'image/jpeg' });
+          const previewUrl = URL.createObjectURL(blob);
           
-          // Clean up
-          stream.getTracks().forEach(track => track.stop());
-        }, 'image/jpeg', 0.8);
-      };
+          setCapturedMedia({
+            file,
+            preview: previewUrl,
+            type: 'image'
+          });
+        }
+      }
+      
+      // Clean up
+      stream.getTracks().forEach(track => track.stop());
       
     } catch (error) {
       console.error('Photo capture failed:', error);
@@ -285,13 +298,8 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
   };
 
   const handleSendMedia = () => {
-    if (capturedMedia) {
-      if (onSendMedia) {
-        onSendMedia(capturedMedia.file, capturedMedia.type);
-      } else {
-        // Fallback to text message with file info
-        onSendMessage(`${getMediaIcon(capturedMedia.type)} ${capturedMedia.file.name} (${(capturedMedia.file.size / 1024 / 1024).toFixed(1)}MB)`);
-      }
+    if (capturedMedia && onSendMedia) {
+      onSendMedia(capturedMedia.file, capturedMedia.type);
       
       // Clean up
       URL.revokeObjectURL(capturedMedia.preview);

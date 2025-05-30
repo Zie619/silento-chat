@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import CreateRoom from './components/CreateRoom';
 import JoinRoom from './components/JoinRoom';
 import ChatRoom from './components/ChatRoom';
@@ -8,6 +8,46 @@ type AppState = 'loading' | 'home' | 'create' | 'join' | 'chat';
 interface RoomInfo {
   roomId: string;
   clientId: string;
+}
+
+// Swipe gesture hook
+function useSwipeGesture(onSwipeLeft?: () => void, onSwipeRight?: () => void) {
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX.current = e.changedTouches[0].screenX;
+    };
+    
+    const handleTouchEnd = (e: TouchEvent) => {
+      touchEndX.current = e.changedTouches[0].screenX;
+      handleSwipe();
+    };
+    
+    const handleSwipe = () => {
+      if (touchStartX.current === null || touchEndX.current === null) return;
+      
+      const deltaX = touchEndX.current - touchStartX.current;
+      const threshold = 50; // minimum distance for swipe
+      
+      if (Math.abs(deltaX) > threshold) {
+        if (deltaX > 0 && onSwipeRight) {
+          onSwipeRight(); // Swipe right
+        } else if (deltaX < 0 && onSwipeLeft) {
+          onSwipeLeft(); // Swipe left
+        }
+      }
+    };
+    
+    document.addEventListener('touchstart', handleTouchStart);
+    document.addEventListener('touchend', handleTouchEnd);
+    
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [onSwipeLeft, onSwipeRight]);
 }
 
 // Modern Logo Component
@@ -63,6 +103,20 @@ const SplashScreen = () => (
 function App() {
   const [state, setState] = useState<AppState>('loading');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [previousState, setPreviousState] = useState<AppState | null>(null);
+
+  // Add swipe gestures for navigation
+  useSwipeGesture(
+    undefined, // No swipe left action needed
+    () => {
+      // Swipe right to go back
+      if (state === 'create' || state === 'join') {
+        setState('home');
+      } else if (state === 'chat' && previousState) {
+        handleLeaveRoom();
+      }
+    }
+  );
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -85,18 +139,21 @@ function App() {
   const handleRoomCreated = (roomId: string) => {
     const clientId = sessionStorage.getItem('clientId') || `client_${Date.now()}`;
     setRoomInfo({ roomId, clientId });
+    setPreviousState(state);
     setState('chat');
   };
 
   const handleRoomJoined = (roomId: string) => {
     const clientId = sessionStorage.getItem('clientId') || `client_${Date.now()}`;
     setRoomInfo({ roomId, clientId });
+    setPreviousState(state);
     setState('chat');
   };
 
   const handleLeaveRoom = () => {
     setRoomInfo(null);
     setState('home');
+    setPreviousState(null);
   };
 
   const renderContent = () => {
