@@ -40,20 +40,39 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         // Create splash screen with full-screen image
         splashImageView = UIImageView()
         
-        // Try to load splash.png from bundle
+        // Try to load splash image from Assets.xcassets first
         if let splashImage = UIImage(named: "splash") {
             splashImageView.image = splashImage
+            print("ViewController: Successfully loaded splash image from Assets")
         } else {
-            // Fallback to app icon if splash.png not found
+            // Fallback to app icon if splash image not found
             if let appIcon = UIImage(named: "AppIcon") {
                 splashImageView.image = appIcon
+                print("ViewController: Using AppIcon as fallback")
             } else {
-                // Last fallback - create a simple colored background
+                // Last fallback - create a gradient background with app name
                 splashImageView.backgroundColor = UIColor.systemBlue
+                
+                // Add app name label
+                let label = UILabel()
+                label.text = "Silento"
+                label.textColor = UIColor.white
+                label.font = UIFont.systemFont(ofSize: 48, weight: .bold)
+                label.textAlignment = .center
+                label.translatesAutoresizingMaskIntoConstraints = false
+                splashImageView.addSubview(label)
+                
+                NSLayoutConstraint.activate([
+                    label.centerXAnchor.constraint(equalTo: splashImageView.centerXAnchor),
+                    label.centerYAnchor.constraint(equalTo: splashImageView.centerYAnchor)
+                ])
+                
+                print("ViewController: Using text fallback for splash")
             }
         }
         
         splashImageView.contentMode = .scaleAspectFill
+        splashImageView.clipsToBounds = true
         splashImageView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(splashImageView)
         

@@ -541,35 +541,38 @@ body {
 }
 
 .input-container {
-  padding: var(--ios-spacing-lg);
-  background: var(--ios-background-secondary);
-  border-top: 1px solid var(--ios-separator);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: var(--ios-spacing-md);
+  padding-bottom: max(var(--ios-spacing-md), env(safe-area-inset-bottom));
 }
 
 .text-input-area {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 8px;
-  margin-bottom: 12px;
+  gap: var(--ios-spacing-sm);
+  margin-bottom: var(--ios-spacing-md);
+  align-items: flex-end;
 }
 
 .message-input {
   flex: 1;
-  margin: 0;
-  background: transparent;
-  border: none;
-  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 16px;
+  border-radius: 22px;
   color: white;
-  font-size: var(--ios-font-size-callout);
+  font-size: 16px;
   font-family: var(--ios-font-family);
+  resize: none;
+  max-height: 120px;
+  min-height: 44px;
 }
 
 .message-input:focus {
   outline: none;
-  background: transparent;
+  border-color: var(--ios-system-blue);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .message-input::placeholder {
@@ -580,18 +583,24 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 22px;
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
+  height: 44px;
 }
 
 .btn-send:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-send:active {
+  transform: scale(0.95);
 }
 
 .btn-send:disabled {
@@ -605,26 +614,46 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--ios-spacing-sm);
+  padding: 0;
 }
 
 .btn-media-action {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 12px 8px;
-  border-radius: 10px;
+  padding: 16px 8px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   color: white;
+  min-height: 72px;
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-media-action:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
+}
+
+.btn-media-action:active {
+  transform: scale(0.95);
+}
+
+.btn-media-action.recording {
+  background: linear-gradient(135deg, #ff453a 0%, #ff2d92 100%);
+  border-color: rgba(255, 69, 58, 0.5);
+  animation: pulse-recording 1.5s infinite;
+}
+
+@keyframes pulse-recording {
+  0% { box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 69, 58, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 69, 58, 0); }
 }
 
 .btn-media-action:disabled {
@@ -634,33 +663,37 @@ body {
 }
 
 .btn-media-action span {
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-/* iOS-style inputs */
-.ios-input {
-  width: 100%;
-  padding: var(--ios-spacing-lg);
-  border: 1px solid var(--ios-separator);
+/* Recording indicator */
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--ios-spacing-sm);
+  background: rgba(255, 69, 58, 0.1);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  padding: var(--ios-spacing-md);
   border-radius: var(--ios-radius-lg);
-  background: var(--ios-background-secondary);
-  color: var(--ios-label);
-  font-size: var(--ios-font-size-body);
-  font-family: var(--ios-font-family);
-  transition: all var(--ios-transition-fast);
-  backdrop-filter: blur(10px);
+  color: var(--ios-system-red);
+  font-weight: 600;
+  margin-top: var(--ios-spacing-sm);
 }
 
-.ios-input:focus {
-  outline: none;
-  border-color: var(--ios-system-blue);
-  background: var(--ios-background-tertiary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.1);
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--ios-system-red);
+  border-radius: 50%;
+  animation: pulse 1s infinite;
 }
 
-.ios-input::placeholder {
-  color: var(--ios-placeholder);
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* iOS-style navigation */
@@ -771,4 +804,258 @@ body {
 /* iOS-style haptic feedback simulation */
 .ios-haptic:active {
   transform: scale(0.98);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .chat-header {
+    padding: var(--ios-spacing-sm) var(--ios-spacing-md);
+  }
+  
+  .chat-header h2 {
+    font-size: var(--ios-font-size-title3);
+  }
+  
+  .status-indicator {
+    font-size: var(--ios-font-size-caption1);
+  }
+  
+  .btn-leave {
+    padding: var(--ios-spacing-xs) var(--ios-spacing-sm);
+    font-size: var(--ios-font-size-caption1);
+  }
+  
+  .media-actions {
+    gap: var(--ios-spacing-xs);
+  }
+  
+  .btn-media-action {
+    padding: 12px 6px;
+    min-height: 64px;
+  }
+  
+  .btn-media-action span {
+    font-size: 11px;
+  }
+  
+  /* Improve touch targets */
+  .btn-media-action, .btn-send, .message-input {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  /* Better keyboard handling */
+  .input-container {
+    position: relative;
+    z-index: 100;
+  }
+  
+  /* Fix iOS keyboard issues */
+  @supports (-webkit-touch-callout: none) {
+    .input-container {
+      padding-bottom: max(var(--ios-spacing-md), env(safe-area-inset-bottom, 20px));
+    }
+    
+    body {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+  .btn-media-action {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .btn-media-action:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS viewport and safe area handling */
+  html {
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    height: -webkit-fill-available;
+    /* Prevent scrolling on iOS */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+  }
+  
+  #root {
+    height: -webkit-fill-available;
+  }
+  
+  .app {
+    height: -webkit-fill-available;
+  }
+  
+  /* Chat screen iOS fixes */
+  .chat-screen {
+    height: -webkit-fill-available;
+    overflow: hidden;
+  }
+  
+  .chat-container {
+    height: calc(-webkit-fill-available - 80px); /* Account for header */
+    overflow: hidden;
+  }
+  
+  .messages-area {
+    height: calc(100% - 120px); /* Account for input area */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Input area fixes for iOS keyboard */
+  .input-container {
+    position: sticky;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 1000;
+  }
+  
+  /* Prevent zoom on input focus */
+  .message-input {
+    font-size: 16px !important;
+    transform: translateZ(0);
+  }
+  
+  /* Better button touch handling */
+  .btn-media-action, .btn-send {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+  
+  /* Fix status bar issues */
+  .chat-header {
+    padding-top: max(var(--ios-spacing-md), env(safe-area-inset-top, 20px));
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Additional mobile improvements */
+@media (max-width: 768px) and (max-height: 900px) {
+  /* Compact mobile devices */
+  .media-actions {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  
+  .btn-media-action {
+    padding: 10px 4px;
+    min-height: 56px;
+  }
+  
+  .btn-media-action span {
+    font-size: 10px;
+  }
+  
+  .input-container {
+    padding: 12px;
+  }
+  
+  .text-input-area {
+    margin-bottom: 8px;
+  }
+}
+
+/* Ultra compact screens (iPhone SE, etc) */
+@media (max-width: 375px) and (max-height: 667px) {
+  .btn-media-action {
+    padding: 8px 2px;
+    min-height: 48px;
+    gap: 2px;
+  }
+  
+  .btn-media-action svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .btn-media-action span {
+    font-size: 9px;
+  }
+  
+  .message-input {
+    padding: 12px 14px;
+    min-height: 40px;
+  }
+  
+  .btn-send {
+    min-width: 40px;
+    height: 40px;
+    padding: 10px;
+  }
+}
+
+/* Landscape mobile fixes */
+@media (max-height: 500px) and (orientation: landscape) {
+  .input-container {
+    padding: 8px 12px;
+  }
+  
+  .media-actions {
+    gap: 2px;
+  }
+  
+  .btn-media-action {
+    padding: 6px 4px;
+    min-height: 40px;
+  }
+  
+  .btn-media-action span {
+    font-size: 8px;
+  }
+  
+  .text-input-area {
+    margin-bottom: 6px;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .btn-media-action, .btn-send {
+    border-width: 0.5px;
+  }
+  
+  .input-container {
+    border-top-width: 0.5px;
+  }
+}
+
+/* Dark mode improvements */
+@media (prefers-color-scheme: dark) {
+  .input-container {
+    background: rgba(0, 0, 0, 0.95);
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .message-input {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  .message-input:focus {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--ios-system-blue);
+  }
 }
