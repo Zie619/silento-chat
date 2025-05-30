@@ -12,7 +12,8 @@
     "start": "NODE_ENV=production node dist/server/index.js",
     "start:prod": "NODE_ENV=production node dist/server/index.js",
     "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "npm run build"
   },
   "keywords": [
     "anonymous",
