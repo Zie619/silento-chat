@@ -13,10 +13,14 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
   const handleJoinRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Keep the original case as entered by the user
-    const trimmedCode = roomCode.trim();
-    if (!trimmedCode) {
+    const code = roomCode.trim().toUpperCase();
+    if (!code) {
       setError('Please enter a room code');
+      return;
+    }
+
+    if (code.length !== 6) {
+      setError('Room code must be 6 characters');
       return;
     }
 
@@ -27,98 +31,91 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
       // Simulate room join delay
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // More flexible validation - allow alphanumeric with hyphens
-      const roomPattern = /^[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+$/;
-      if (!roomPattern.test(trimmedCode)) {
-        // Also check if it's a simple 6-character code (legacy support)
-        const legacyPattern = /^[A-Z0-9]{6}$/;
-        if (!legacyPattern.test(trimmedCode.toUpperCase())) {
-          throw new Error('Invalid room code format');
-        }
+      // Validate format: 6 alphanumeric characters
+      const validPattern = /^[A-Z0-9]{6}$/;
+      if (!validPattern.test(code)) {
+        throw new Error('Invalid room code format');
       }
       
-      onRoomJoined(trimmedCode);
+      onRoomJoined(code);
     } catch (err) {
       setError('Invalid room code. Please check and try again.');
       setIsJoining(false);
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (value.length <= 6) {
+      setRoomCode(value);
+      setError(null);
+    }
+  };
+
   return (
-    <div className="form-screen">
-      <div className="form-header">
-        <button className="back-button" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <div className="screen">
+      <div className="header">
+        <button className="back-btn" onClick={onBack}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5m0 0l7 7m-7-7l7-7"/>
           </svg>
         </button>
-        <h1 className="form-title">Join Room</h1>
-        <div style={{ width: 40 }} /> {/* Spacer for centering */}
+        <h1>Join Room</h1>
+        <div style={{ width: 40 }} />
       </div>
 
-      <form onSubmit={handleJoinRoom} className="form-content">
-        <div className="form-group">
-          <label className="form-label" htmlFor="roomCode">Room Code</label>
+      <form onSubmit={handleJoinRoom} className="content">
+        <div className="info-section">
+          <h2>Enter room code</h2>
+          <p>Ask the room creator for the 6-character code to join their conversation.</p>
+        </div>
+
+        <div className="input-group">
           <input
-            id="roomCode"
             type="text"
-            className="form-input"
+            className="room-input"
             value={roomCode}
-            onChange={(e) => {
-              setRoomCode(e.target.value);
-              setError(null);
-            }}
-            placeholder="e.g. swift-blue-eagle or ABC123"
+            onChange={handleInputChange}
+            placeholder="ABC123"
+            maxLength={6}
             autoComplete="off"
             autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
+            autoCapitalize="characters"
+            spellCheck={false}
             disabled={isJoining}
           />
-          <p className="form-hint">Enter the room code shared with you</p>
+          <div className="input-hint">{roomCode.length}/6 characters</div>
         </div>
 
         {error && (
-          <div className="error-message">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            {error}
+          <div className="error-box">
+            <span>⚠️</span> {error}
           </div>
         )}
 
-        <div className="join-info">
+        <div className="info-list">
           <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span>All messages are end-to-end encrypted</span>
+            <span>🔐</span>
+            <span>Encrypted connection</span>
           </div>
           <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-            </svg>
-            <span>No personal information required</span>
+            <span>🙈</span>
+            <span>No personal data collected</span>
           </div>
           <div className="info-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span>Room expires when everyone leaves</span>
+            <span>💨</span>
+            <span>Messages disappear after session</span>
           </div>
         </div>
 
         <button
           type="submit"
-          className="form-submit"
-          disabled={isJoining || !roomCode.trim()}
+          className="primary-btn"
+          disabled={isJoining || roomCode.length !== 6}
         >
           {isJoining ? (
             <>
-              <span className="loading-spinner"></span>
+              <span className="spinner"></span>
               Joining Room...
             </>
           ) : (

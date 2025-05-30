@@ -141,20 +141,22 @@ function MessageList({ messages, currentUserId }: MessageListProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="empty-messages">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        <h3>No messages yet</h3>
-        <p>Send a message to start the conversation</p>
+      <div className="messages-area">
+        <div className="empty-messages">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <h3>No messages yet</h3>
+          <p>Send a message to start the conversation</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="messages-area">
       {messages.map(renderMessage)}
-    </>
+    </div>
   );
 }
 
