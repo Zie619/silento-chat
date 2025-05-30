@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { setupRoutes } from './routes.js';
 
@@ -38,12 +39,33 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve static files from React build (production only)
 if (!isDevelopment) {
-  // When running in production, the compiled server is in dist/server/
-  // and the React build is in the root dist/ folder
-  const buildPath = path.resolve(process.cwd(), 'dist');
+  // Try multiple possible paths for the React build
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'dist'),
+    path.resolve(__dirname, '..', '..', 'dist'),
+    path.resolve(__dirname, '..', 'dist'),
+    path.resolve('/opt/render/project/src/dist')
+  ];
+  
+  let buildPath = possiblePaths[0]; // default
+  
+  // Find the correct path that exists
+  for (const testPath of possiblePaths) {
+    try {
+      if (fs.existsSync(testPath) && fs.existsSync(path.join(testPath, 'index.html'))) {
+        buildPath = testPath;
+        break;
+      }
+    } catch (e) {
+      // ignore errors, continue checking
+    }
+  }
+  
   console.log(`Serving static files from: ${buildPath}`);
   console.log(`Current working directory: ${process.cwd()}`);
   console.log(`Server __dirname: ${__dirname}`);
+  console.log(`Checking if index.html exists: ${fs.existsSync(path.join(buildPath, 'index.html'))}`);
+  
   app.use(express.static(buildPath));
 }
 
