@@ -22,10 +22,11 @@ const corsOptions = {
   origin: isDevelopment 
     ? ['http://localhost:3000', 'http://127.0.0.1:3000']
     : [
-        'https://silento-backend.onrender.com', // Your actual backend domain
-        /^https:\/\/.*\.railway\.app$/, // Allow Railway preview deployments
-        /^https:\/\/.*\.vercel\.app$/, // Allow Vercel deployments
-        /^https:\/\/.*\.netlify\.app$/, // Allow Netlify deployments
+        'https://silento-backend.onrender.com',
+        'https://render.com',
+        'https://railway.app',
+        'https://vercel.app',
+        'https://netlify.app'
       ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
