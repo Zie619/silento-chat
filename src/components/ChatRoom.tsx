@@ -122,38 +122,33 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
   const getConnectionStatus = () => {
     if (!isConnected) return 'Connecting...';
     if (peers.length === 0) return 'Waiting for peers...';
-    return `Connected to ${peers.length} peer${peers.length !== 1 ? 's' : ''}`;
+    return `${peers.length} peer${peers.length !== 1 ? 's' : ''} connected`;
   };
 
   return (
-    <div className="chat-screen ios-fade-in">
+    <div className="chat-screen">
       <div className="chat-header">
         <div className="chat-header-content">
           <div className="room-info">
-            <h2>Room {roomId}</h2>
+            <h2>{roomId}</h2>
             <div className="status-indicator">
-              {isConnected ? '🟢' : '🟡'} {getConnectionStatus()}
+              {getConnectionStatus()}
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: 'var(--ios-spacing-sm)', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
             <button 
-              className="secondary-button"
+              className="peer-button"
               onClick={() => setShowPeerList(true)}
               title="View peers"
-              style={{ 
-                padding: 'var(--ios-spacing-sm)', 
-                minHeight: 'auto',
-                fontSize: 'var(--ios-font-size-caption1)'
-              }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              {peers.length > 0 && <span>{peers.length}</span>}
+              {peers.length > 0 && <span className="peer-count">{peers.length}</span>}
             </button>
             
             <button 
@@ -168,18 +163,11 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
       </div>
 
       {(webrtcError || transferError) && (
-        <div className="ios-status-error" style={{ 
-          margin: 'var(--ios-spacing-md)',
-          padding: 'var(--ios-spacing-md)',
-          borderRadius: 'var(--ios-radius-lg)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--ios-spacing-sm)'
-        }}>
+        <div className="error-banner">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/>
-            <line x1="9" y1="9" x2="15" y2="15"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
           {webrtcError || transferError}
         </div>
@@ -192,21 +180,19 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
         </div>
 
         {activeTransfers.length > 0 && (
-          <div style={{ padding: 'var(--ios-spacing-md)' }}>
+          <div className="transfer-container">
             {activeTransfers.map(transfer => (
               <FileTransferProgress key={transfer.id} transfer={transfer} />
             ))}
           </div>
         )}
-
-        <div className="input-container">
-          <MessageInput 
-            onSendMessage={handleSendMessage} 
-            onSendMedia={handleSendMedia}
-            disabled={!isConnected} 
-          />
-        </div>
       </div>
+
+      <MessageInput 
+        onSendMessage={handleSendMessage} 
+        onSendMedia={handleSendMedia}
+        disabled={!isConnected} 
+      />
 
       {showPeerList && (
         <PeerList 

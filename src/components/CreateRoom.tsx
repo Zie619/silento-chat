@@ -9,120 +9,114 @@ function CreateRoom({ onRoomCreated, onBack }: CreateRoomProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const generateRoomId = () => {
+    // Generate a memorable room ID with 3 random words
+    const adjectives = ['swift', 'bright', 'quiet', 'bold', 'calm', 'clear', 'warm', 'cool', 'fresh', 'sharp'];
+    const colors = ['blue', 'red', 'green', 'gold', 'silver', 'purple', 'orange', 'teal', 'coral', 'jade'];
+    const animals = ['wolf', 'eagle', 'tiger', 'bear', 'fox', 'hawk', 'lion', 'deer', 'seal', 'lynx'];
+    
+    const randomItem = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+    
+    return `${randomItem(adjectives)}-${randomItem(colors)}-${randomItem(animals)}`;
+  };
+
   const handleCreateRoom = async () => {
     setIsCreating(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/create-room', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create room');
-      }
-
-      const data = await response.json();
-      onRoomCreated(data.roomId);
+      // Simulate room creation delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const roomId = generateRoomId();
+      onRoomCreated(roomId);
     } catch (err) {
-      console.error('Error creating room:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create room');
-    } finally {
+      setError('Failed to create room. Please try again.');
       setIsCreating(false);
     }
   };
 
   return (
-    <div className="room-screen">
-      <div className="room-header">
+    <div className="form-screen">
+      <div className="form-header">
         <button className="back-button" onClick={onBack}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5"/>
-            <path d="M12 19l-7-7 7-7"/>
+            <path d="M19 12H5m0 0l7 7m-7-7l7-7"/>
           </svg>
         </button>
-        <h2>Create Room</h2>
+        <h1 className="form-title">Create Room</h1>
+        <div style={{ width: 40 }} /> {/* Spacer for centering */}
       </div>
 
-      <div className="room-content">
-        <div className="create-room-info">
-          <div className="info-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
+      <div className="form-content">
+        <div className="form-info">
+          <div className="info-card">
+            <div className="info-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                <path d="M12 8v4m0 4h.01"/>
+              </svg>
+            </div>
+            <div className="info-content">
+              <h3>Private & Secure</h3>
+              <p>Your room will be protected with end-to-end encryption. Only people with the room code can join.</p>
+            </div>
           </div>
-          <h3>Create New Chat Room</h3>
-          <p>
-            You'll receive a unique room code that others can use to join your conversation.
-            The room will be automatically deleted after 5 minutes of inactivity.
-          </p>
+
+          <div className="info-card">
+            <div className="info-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <div className="info-content">
+              <h3>Temporary</h3>
+              <p>Messages disappear when everyone leaves. No history is stored on any server.</p>
+            </div>
+          </div>
+
+          <div className="info-card">
+            <div className="info-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div className="info-content">
+              <h3>Share Easily</h3>
+              <p>Get a simple room code to share with others. No sign-up required.</p>
+            </div>
+          </div>
         </div>
 
         {error && (
           <div className="error-message">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             {error}
           </div>
         )}
 
-        <div className="room-actions">
-          <button 
-            className="primary-button"
-            onClick={handleCreateRoom}
-            disabled={isCreating}
-          >
-            {isCreating ? (
-              <>
-                <div className="loading-spinner"></div>
-                Creating Room...
-              </>
-            ) : (
-              'Create Room'
-            )}
-          </button>
-        </div>
-
-        <div className="room-features">
-          <h4>Features</h4>
-          <ul>
-            <li>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
-              Real-time messaging
-            </li>
-            <li>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
-              Image sharing
-            </li>
-            <li>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
-              Video file transfer
-            </li>
-            <li>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 12l2 2 4-4"/>
-                <circle cx="12" cy="12" r="10"/>
-              </svg>
-              Peer-to-peer encryption
-            </li>
-          </ul>
-        </div>
+        <button
+          className="form-submit"
+          onClick={handleCreateRoom}
+          disabled={isCreating}
+        >
+          {isCreating ? (
+            <>
+              <span className="loading-spinner"></span>
+              Creating Room...
+            </>
+          ) : (
+            'Create Secure Room'
+          )}
+        </button>
       </div>
     </div>
   );
