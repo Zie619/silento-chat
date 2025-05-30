@@ -5,8 +5,11 @@ import AVFoundation
 class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
     private var webView: WKWebView!
-    private var activityIndicator: UIActivityIndicatorView!
+    private var splashImageView: UIImageView!
     private var errorLabel: UILabel!
+    private var loadingTimeout: Timer?
+    
+    private let LOADING_TIMEOUT: TimeInterval = 30.0 // 30 seconds timeout
     
     private var urlsToTry = [
         "https://silento-backend.onrender.com",  // Your hosted backend
@@ -20,35 +23,71 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         super.viewDidLoad()
         
         // Set background color to prevent black screen
-        view.backgroundColor = UIColor.systemBackground
+        view.backgroundColor = UIColor.black
         
         print("ViewController: viewDidLoad started")
+        setupSplashScreen()
         setupErrorLabel()
         setupWebView()
-        setupActivityIndicator()
         
         // Delay loading to ensure everything is set up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.loadWebApp()
         }
+    }
+    
+    private func setupSplashScreen() {
+        // Create splash screen with full-screen image
+        splashImageView = UIImageView()
+        
+        // Try to load splash.png from bundle
+        if let splashImage = UIImage(named: "splash") {
+            splashImageView.image = splashImage
+        } else {
+            // Fallback to app icon if splash.png not found
+            if let appIcon = UIImage(named: "AppIcon") {
+                splashImageView.image = appIcon
+            } else {
+                // Last fallback - create a simple colored background
+                splashImageView.backgroundColor = UIColor.systemBlue
+            }
+        }
+        
+        splashImageView.contentMode = .scaleAspectFill
+        splashImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(splashImageView)
+        
+        // Make splash image full screen
+        NSLayoutConstraint.activate([
+            splashImageView.topAnchor.constraint(equalTo: view.topAnchor),
+            splashImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            splashImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            splashImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        print("ViewController: Splash screen setup completed")
     }
     
     private func setupErrorLabel() {
         errorLabel = UILabel()
         errorLabel.text = "Loading Silento..."
-        errorLabel.textColor = UIColor.label
+        errorLabel.textColor = UIColor.white
         errorLabel.textAlignment = .center
         errorLabel.numberOfLines = 0
-        errorLabel.font = UIFont.systemFont(ofSize: 16)
+        errorLabel.font = UIFont.systemFont(ofSize: 18, weight: .medium)
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
+        errorLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        errorLabel.layer.cornerRadius = 8
+        errorLabel.clipsToBounds = true
         
         view.addSubview(errorLabel)
         
         NSLayoutConstraint.activate([
             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
-            errorLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20)
+            errorLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+            errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+            errorLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+            errorLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
         ])
     }
     
@@ -67,6 +106,9 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         // Configure user content controller for JavaScript bridge
         let userContentController = WKUserContentController()
         configuration.userContentController = userContentController
+        
+        // Set a reasonable timeout for resource loading
+        configuration.websiteDataStore = WKWebsiteDataStore.default()
         
         // Inject CSS for iOS-specific styling
         let cssString = """
@@ -115,9 +157,9 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.translatesAutoresizingMaskIntoConstraints = false
-        webView.backgroundColor = UIColor.systemBackground
+        webView.backgroundColor = UIColor.black
         webView.isOpaque = false
-        webView.scrollView.backgroundColor = UIColor.systemBackground
+        webView.scrollView.backgroundColor = UIColor.black
         webView.scrollView.bounces = false
         webView.scrollView.showsVerticalScrollIndicator = false
         webView.scrollView.showsHorizontalScrollIndicator = false
@@ -127,7 +169,7 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         
         // Setup constraints
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: view.topAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -136,20 +178,28 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         print("ViewController: WebView setup completed")
     }
     
-    private func setupActivityIndicator() {
-        activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.color = UIColor.systemBlue
-        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
-        activityIndicator.hidesWhenStopped = true
+    private func startLoadingTimeout() {
+        // Cancel any existing timeout
+        loadingTimeout?.invalidate()
         
-        view.addSubview(activityIndicator)
-        
-        NSLayoutConstraint.activate([
-            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -50)
-        ])
-        
-        print("ViewController: Activity indicator setup completed")
+        // Start new timeout
+        loadingTimeout = Timer.scheduledTimer(withTimeInterval: LOADING_TIMEOUT, repeats: false) { [weak self] _ in
+            DispatchQueue.main.async {
+                print("ViewController: Loading timeout reached")
+                self?.handleLoadingTimeout()
+            }
+        }
+    }
+    
+    private func stopLoadingTimeout() {
+        loadingTimeout?.invalidate()
+        loadingTimeout = nil
+    }
+    
+    private func handleLoadingTimeout() {
+        print("ViewController: Handling loading timeout, trying next URL")
+        webView.stopLoading()
+        tryNextUrl()
     }
     
     private func loadWebApp() {
@@ -172,57 +222,66 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
         
         print("ViewController: Loading URL: \(urlString) (attempt \(currentUrlIndex + 1)/\(urlsToTry.count))")
         
-        let request = URLRequest(url: url)
+        // Create request with timeout
+        var request = URLRequest(url: url)
+        request.timeoutInterval = LOADING_TIMEOUT
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        // Start timeout timer
+        startLoadingTimeout()
+        
         webView.load(request)
-        activityIndicator.startAnimating()
     }
     
     private func tryNextUrl() {
+        stopLoadingTimeout()
+        
         currentUrlIndex += 1
         if currentUrlIndex < urlsToTry.count {
             print("ViewController: Trying next URL...")
-            loadWebApp()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.loadWebApp()
+            }
         } else {
-            showError("Failed to connect to any server. Please check your internet connection and ensure the development server is running.")
+            showError("Failed to connect to any server.\nPlease check your internet connection.\n\nTap to retry")
         }
     }
     
     private func showError(_ message: String) {
         print("ViewController: Error - \(message)")
         
+        stopLoadingTimeout()
+        
         DispatchQueue.main.async {
             self.errorLabel.text = message
-            self.activityIndicator.stopAnimating()
             self.webView.isHidden = true
+            self.splashImageView.isHidden = false
             
-            // Add retry button
-            let retryButton = UIButton(type: .system)
-            retryButton.setTitle("Retry", for: .normal)
-            retryButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
-            retryButton.backgroundColor = UIColor.systemBlue
-            retryButton.setTitleColor(.white, for: .normal)
-            retryButton.layer.cornerRadius = 8
-            retryButton.translatesAutoresizingMaskIntoConstraints = false
-            retryButton.addTarget(self, action: #selector(self.retryLoading), for: .touchUpInside)
-            
-            self.view.addSubview(retryButton)
-            
-            NSLayoutConstraint.activate([
-                retryButton.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-                retryButton.topAnchor.constraint(equalTo: self.errorLabel.bottomAnchor, constant: 20),
-                retryButton.widthAnchor.constraint(equalToConstant: 120),
-                retryButton.heightAnchor.constraint(equalToConstant: 44)
-            ])
+            // Make error label tappable for retry
+            self.errorLabel.isUserInteractionEnabled = true
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.retryLoading))
+            self.errorLabel.addGestureRecognizer(tapGesture)
+        }
+    }
+    
+    private func hideLoadingAndShowWebView() {
+        DispatchQueue.main.async {
+            // Smooth transition from splash to web view
+            UIView.transition(with: self.view, duration: 0.5, options: .transitionCrossDissolve, animations: {
+                self.splashImageView.isHidden = true
+                self.errorLabel.isHidden = true
+                self.webView.isHidden = false
+            }, completion: nil)
         }
     }
     
     @objc private func retryLoading() {
-        // Remove any existing retry buttons
-        view.subviews.forEach { subview in
-            if let button = subview as? UIButton, button.titleLabel?.text == "Retry" {
-                button.removeFromSuperview()
-            }
-        }
+        print("ViewController: Retry requested")
+        
+        // Reset UI
+        errorLabel.isUserInteractionEnabled = false
+        errorLabel.gestureRecognizers?.removeAll()
+        splashImageView.isHidden = false
         
         // Reset URL index to start from the beginning
         currentUrlIndex = 0
@@ -233,27 +292,43 @@ class ViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         print("ViewController: Started loading")
-        activityIndicator.startAnimating()
-        errorLabel.text = "Loading..."
+        DispatchQueue.main.async {
+            self.errorLabel.text = "Loading..."
+            self.splashImageView.isHidden = false
+        }
     }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         print("ViewController: Finished loading successfully")
-        activityIndicator.stopAnimating()
-        errorLabel.isHidden = true
-        webView.isHidden = false
+        stopLoadingTimeout()
+        
+        // Wait a moment to ensure content is rendered
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.hideLoadingAndShowWebView()
+        }
     }
     
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         print("ViewController: Navigation failed with error: \(error.localizedDescription)")
-        activityIndicator.stopAnimating()
         tryNextUrl()
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         print("ViewController: Provisional navigation failed with error: \(error.localizedDescription)")
-        activityIndicator.stopAnimating()
         tryNextUrl()
+    }
+    
+    // Handle SSL certificate errors for development
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        print("ViewController: Received authentication challenge")
+        
+        // For development, accept self-signed certificates
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+            let credential = URLCredential(trust: challenge.protectionSpace.serverTrust!)
+            completionHandler(.useCredential, credential)
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
     }
     
     // MARK: - WKUIDelegate
