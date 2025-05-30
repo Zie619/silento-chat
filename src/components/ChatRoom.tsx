@@ -54,11 +54,11 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
     await sendP2PMessage('message', message);
   };
 
-  const handleSendFile = async (file: File) => {
+  const handleSendMedia = async (file: File, type: 'image' | 'video' | 'audio') => {
     try {
       const message: Message = {
         id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: file.type.startsWith('image/') ? 'image' : 'video',
+        type: type,
         content: file.name,
         senderId: clientId,
         timestamp: Date.now(),
@@ -68,9 +68,23 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
       // Add to local messages
       setMessages(prev => [...(prev || []), message]);
 
-      // Send file to all peers
-      await sendFile(file, message.id);
+      // Send file to all peers if available
+      if (sendFile) {
+        await sendFile(file, message.id);
+      }
       
+    } catch (error) {
+      console.error('Error sending media:', error);
+    }
+  };
+
+  const handleSendFile = async (file: File) => {
+    try {
+      const fileType = file.type.startsWith('image/') ? 'image' : 
+                       file.type.startsWith('video/') ? 'video' : 
+                       file.type.startsWith('audio/') ? 'audio' : 'image';
+      
+      await handleSendMedia(file, fileType as 'image' | 'video' | 'audio');
       setShowFileUpload(false);
     } catch (error) {
       console.error('Error sending file:', error);
@@ -186,7 +200,11 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
         )}
 
         <div className="input-container">
-          <MessageInput onSendMessage={handleSendMessage} disabled={!isConnected} />
+          <MessageInput 
+            onSendMessage={handleSendMessage} 
+            onSendMedia={handleSendMedia}
+            disabled={!isConnected} 
+          />
         </div>
       </div>
 

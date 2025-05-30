@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import CreateRoom from './components/CreateRoom';
 import JoinRoom from './components/JoinRoom';
 import ChatRoom from './components/ChatRoom';
+import LoadingScreen from './components/LoadingScreen';
 
-type AppState = 'home' | 'create' | 'join' | 'chat';
+type AppState = 'loading' | 'home' | 'create' | 'join' | 'chat';
 
 interface RoomInfo {
   roomId: string;
@@ -32,16 +33,26 @@ const SilentoLogo = () => (
 );
 
 function App() {
-  const [state, setState] = useState<AppState>('home');
+  const [state, setState] = useState<AppState>('loading');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
 
-  // Generate unique client ID
+  // Initialize app with loading screen
   useEffect(() => {
-    const storedClientId = sessionStorage.getItem('clientId');
-    if (!storedClientId) {
-      const newClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      sessionStorage.setItem('clientId', newClientId);
-    }
+    const initializeApp = async () => {
+      // Simulate app initialization
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate unique client ID
+      const storedClientId = sessionStorage.getItem('clientId');
+      if (!storedClientId) {
+        const newClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        sessionStorage.setItem('clientId', newClientId);
+      }
+      
+      setState('home');
+    };
+
+    initializeApp();
   }, []);
 
   const handleRoomCreated = (roomId: string) => {
@@ -63,6 +74,8 @@ function App() {
 
   const renderContent = () => {
     switch (state) {
+      case 'loading':
+        return <LoadingScreen />;
       case 'create':
         return <CreateRoom onRoomCreated={handleRoomCreated} onBack={() => setState('home')} />;
       case 'join':

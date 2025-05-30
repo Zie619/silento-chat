@@ -2,14 +2,16 @@ import React, { useState, useRef } from 'react';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
+  onSendMedia?: (file: File, type: 'image' | 'video' | 'audio') => void;
   disabled?: boolean;
 }
 
-function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
+function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageInputProps) {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [capturedMedia, setCapturedMedia] = useState<{file: File, preview: string, type: 'image' | 'video' | 'audio'} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,15 +42,15 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
       return;
     }
 
-    // Create a data URL for the file
-    const dataUrl = await new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'audio';
+    
+    setCapturedMedia({
+      file,
+      preview: previewUrl,
+      type: fileType as 'image' | 'video' | 'audio'
     });
-
-    // Send file as message
-    onSendMessage(`📎 ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
     
     // Reset file input
     event.target.value = '';
@@ -119,11 +121,18 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
         // Draw the video frame to canvas
         context?.drawImage(video, 0, 0);
         
-        // Convert to blob and send
+        // Convert to blob and create file
         canvas.toBlob((blob) => {
           if (blob) {
-            const timestamp = new Date().toLocaleTimeString();
-            onSendMessage(`📷 Photo captured at ${timestamp}`);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const file = new File([blob], `photo-${timestamp}.jpg`, { type: 'image/jpeg' });
+            const previewUrl = URL.createObjectURL(blob);
+            
+            setCapturedMedia({
+              file,
+              preview: previewUrl,
+              type: 'image'
+            });
           }
           
           // Clean up
@@ -150,12 +159,6 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
         if (mediaRecorder && mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         }
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(track => track.stop());
-          setMediaStream(null);
-        }
-        setIsRecording(false);
-        setMediaRecorder(null);
         return;
       }
 
@@ -184,8 +187,15 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
       
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'video/webm' });
-        const duration = Date.now(); // Simplified duration
-        onSendMessage(`🎥 Video recorded (${(blob.size / 1024 / 1024).toFixed(1)}MB)`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const file = new File([blob], `video-${timestamp}.webm`, { type: 'video/webm' });
+        const previewUrl = URL.createObjectURL(blob);
+        
+        setCapturedMedia({
+          file,
+          preview: previewUrl,
+          type: 'video'
+        });
         
         // Clean up
         stream.getTracks().forEach(track => track.stop());
@@ -223,12 +233,6 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
         if (mediaRecorder && mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         }
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(track => track.stop());
-          setMediaStream(null);
-        }
-        setIsRecording(false);
-        setMediaRecorder(null);
         return;
       }
 
@@ -247,7 +251,15 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
       
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
-        onSendMessage(`🎤 Voice message (${(blob.size / 1024).toFixed(1)}KB)`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const file = new File([blob], `voice-${timestamp}.webm`, { type: 'audio/webm' });
+        const previewUrl = URL.createObjectURL(blob);
+        
+        setCapturedMedia({
+          file,
+          preview: previewUrl,
+          type: 'audio'
+        });
         
         // Clean up
         stream.getTracks().forEach(track => track.stop());
@@ -272,8 +284,80 @@ function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
     }
   };
 
+  const handleSendMedia = () => {
+    if (capturedMedia) {
+      if (onSendMedia) {
+        onSendMedia(capturedMedia.file, capturedMedia.type);
+      } else {
+        // Fallback to text message with file info
+        onSendMessage(`${getMediaIcon(capturedMedia.type)} ${capturedMedia.file.name} (${(capturedMedia.file.size / 1024 / 1024).toFixed(1)}MB)`);
+      }
+      
+      // Clean up
+      URL.revokeObjectURL(capturedMedia.preview);
+      setCapturedMedia(null);
+    }
+  };
+
+  const handleCancelMedia = () => {
+    if (capturedMedia) {
+      URL.revokeObjectURL(capturedMedia.preview);
+      setCapturedMedia(null);
+    }
+  };
+
+  const getMediaIcon = (type: string) => {
+    switch (type) {
+      case 'image': return '📷';
+      case 'video': return '🎥';
+      case 'audio': return '🎤';
+      default: return '📎';
+    }
+  };
+
   return (
     <div className="input-container">
+      {capturedMedia && (
+        <div className="media-preview-modal">
+          <div className="media-preview-content">
+            <div className="media-preview-header">
+              <h3>Send {capturedMedia.type}?</h3>
+              <button className="close-btn" onClick={handleCancelMedia}>×</button>
+            </div>
+            
+            <div className="media-preview">
+              {capturedMedia.type === 'image' && (
+                <img src={capturedMedia.preview} alt="Captured" />
+              )}
+              {capturedMedia.type === 'video' && (
+                <video src={capturedMedia.preview} controls />
+              )}
+              {capturedMedia.type === 'audio' && (
+                <div className="audio-preview">
+                  <div className="audio-icon">🎤</div>
+                  <audio src={capturedMedia.preview} controls />
+                  <p>Voice message</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="media-preview-info">
+              <p>{capturedMedia.file.name}</p>
+              <p>{(capturedMedia.file.size / 1024 / 1024).toFixed(1)}MB</p>
+            </div>
+            
+            <div className="media-preview-actions">
+              <button className="cancel-btn" onClick={handleCancelMedia}>
+                Cancel
+              </button>
+              <button className="send-btn" onClick={handleSendMedia}>
+                Send {capturedMedia.type}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-input-area">
         <input 
           type="text" 

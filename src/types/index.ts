@@ -1,6 +1,6 @@
 export interface Message {
   id: string;
-  type: 'text' | 'image' | 'video';
+  type: 'text' | 'image' | 'video' | 'audio';
   content: string;
   senderId: string;
   timestamp: number;
