@@ -1,7 +1,6 @@
 {
   "name": "anonymous-chat-app",
   "version": "1.0.0",
-  "main": "index.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
@@ -15,7 +14,12 @@
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["anonymous", "chat", "p2p", "websocket"],
+  "keywords": [
+    "anonymous",
+    "chat",
+    "p2p",
+    "websocket"
+  ],
   "author": "",
   "license": "ISC",
   "description": "Anonymous peer-to-peer chat application",
@@ -29,7 +33,7 @@
     "@vitejs/plugin-react": "^4.5.0",
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
-    "express": "^5.1.0",
+    "express": "^4.21.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ts-node": "^10.9.2",
