@@ -15,6 +15,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
   const [showCamera, setShowCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState<'photo' | 'video'>('photo');
   const [recordingTime, setRecordingTime] = useState(0);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user'); // Default to front camera
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -87,7 +88,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
   };
 
   const startCamera = async (mode: 'photo' | 'video') => {
-    console.log('Starting camera in mode:', mode);
+    console.log('Starting camera in mode:', mode, 'facing:', facingMode);
     try {
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -98,7 +99,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
 
       const constraints: MediaStreamConstraints = {
         video: { 
-          facingMode: { ideal: 'environment' },
+          facingMode: facingMode,
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 }
         },
@@ -116,7 +117,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         // Fallback to basic constraints if ideal ones fail
         console.warn('Ideal constraints failed, trying basic:', error);
         const basicConstraints: MediaStreamConstraints = {
-          video: true,
+          video: { facingMode: facingMode },
           audio: mode === 'video' ? true : false
         };
         stream = await navigator.mediaDevices.getUserMedia(basicConstraints);
@@ -147,6 +148,22 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
       console.error('Camera access failed:', error);
       alert(`Failed to access camera: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  const switchCamera = async () => {
+    if (!mediaStream) return;
+    
+    // Stop current stream
+    mediaStream.getTracks().forEach(track => track.stop());
+    
+    // Switch facing mode
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    // Restart camera with new facing mode
+    setTimeout(() => {
+      startCamera(cameraMode);
+    }, 100);
   };
 
   const stopCamera = () => {
@@ -185,6 +202,8 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         const file = new File([blob], `photo-${timestamp}.jpg`, { type: 'image/jpeg' });
         const previewUrl = URL.createObjectURL(blob);
         
+        console.log('Photo captured:', file.name, 'Size:', file.size, 'Preview URL:', previewUrl);
+        
         setCapturedMedia({
           file,
           preview: previewUrl,
@@ -192,6 +211,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         });
         
         stopCamera();
+        console.log('Camera stopped, media preview should show now');
       }
     }
   };
@@ -379,6 +399,7 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
 
   const handleSendMedia = () => {
     console.log('handleSendMedia called', capturedMedia);
+    console.log('onSendMedia function available:', !!onSendMedia);
     if (capturedMedia && onSendMedia) {
       console.log('Sending media:', capturedMedia.file.name, capturedMedia.type);
       onSendMedia(capturedMedia.file, capturedMedia.type);
@@ -388,11 +409,17 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
       setCapturedMedia(null);
       console.log('Media sent and cleaned up');
     } else {
-      console.error('Cannot send media - missing data or callback', { capturedMedia, onSendMedia });
+      console.error('Cannot send media - missing data or callback', { 
+        capturedMedia: !!capturedMedia, 
+        onSendMedia: !!onSendMedia,
+        capturedMediaType: capturedMedia?.type,
+        fileName: capturedMedia?.file?.name
+      });
     }
   };
 
   const handleCancelMedia = () => {
+    console.log('Canceling media preview');
     if (capturedMedia) {
       URL.revokeObjectURL(capturedMedia.preview);
       setCapturedMedia(null);
@@ -420,7 +447,14 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
             <span className="camera-title">
               {cameraMode === 'photo' ? 'Take Photo' : 'Record Video'}
             </span>
-            <div></div>
+            <button className="camera-switch-btn" onClick={switchCamera}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M7 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/>
+                <path d="M9 3a2 2 0 0 0-2 2v0a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v0a2 2 0 0 0-2-2"/>
+                <circle cx="12" cy="13" r="3"/>
+                <path d="M16 9h-1"/>
+              </svg>
+            </button>
           </div>
           
           <div className="camera-preview">
@@ -430,6 +464,9 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
               playsInline 
               muted
               className="camera-video"
+              style={{
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+              }}
             />
             
             {isRecording && (
