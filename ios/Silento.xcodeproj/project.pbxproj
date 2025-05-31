@@ -10,6 +10,7 @@
 		2A3B4C5D6E7F8901ABCDEF18 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF19 /* Assets.xcassets */; };
 		2A3B4C5D6E7F8901ABCDEF1A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF1B /* LaunchScreen.storyboard */; };
 		D3CEC1A22DEB1FAA003FD3D9 /* SilentoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC19F2DEB1FAA003FD3D9 /* SilentoApp.swift */; };
+		D3CEC1A32DEB1FAA003FD3D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1A42DEB1FAA003FD3D9 /* AppDelegate.swift */; };
 		D3CEC1E82DEB229E003FD3D9 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E32DEB229E003FD3D9 /* HomeView.swift */; };
 		D3CEC1EA2DEB229E003FD3D9 /* ParticleBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */; };
 		D3CEC1EB2DEB229E003FD3D9 /* CreateRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E22DEB229E003FD3D9 /* CreateRoomView.swift */; };
@@ -18,6 +19,7 @@
 		D3CEC1EE2DEB229E003FD3D9 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */; };
 		D3CEC1EF2DEB229E003FD3D9 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1DF2DEB229E003FD3D9 /* ChatRoomView.swift */; };
 		D3CEC1F02DEB229E003FD3D9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E12DEB229E003FD3D9 /* ContentView.swift */; };
+		D3CEC1F12DEB229E003FD3D9 /* ScreenProtectorKit in Frameworks */ = {isa = PBXBuildFile; productRef = D3CEC1F22DEB229E003FD3D9 /* ScreenProtectorKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,7 @@
 		D3CEC1E42DEB229E003FD3D9 /* JoinRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinRoomView.swift; sourceTree = "<group>"; };
 		D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBackgroundView.swift; sourceTree = "<group>"; };
+		D3CEC1A42DEB1FAA003FD3D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +45,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D3CEC1F12DEB229E003FD3D9 /* ScreenProtectorKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -68,6 +72,7 @@
 				D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */,
 				D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */,
 				D3CEC19F2DEB1FAA003FD3D9 /* SilentoApp.swift */,
+				D3CEC1A42DEB1FAA003FD3D9 /* AppDelegate.swift */,
 				2A3B4C5D6E7F8901ABCDEF19 /* Assets.xcassets */,
 				2A3B4C5D6E7F8901ABCDEF1B /* LaunchScreen.storyboard */,
 				2A3B4C5D6E7F8901ABCDEF1E /* Info.plist */,
@@ -91,8 +96,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 2A3B4C5D6E7F8901ABCDEF24 /* Build configuration list for PBXNativeTarget "Silento" */;
 			buildPhases = (
-				2A3B4C5D6E7F8901ABCDEF25 /* Sources */,
 				2A3B4C5D6E7F8901ABCDEF1F /* Frameworks */,
+				2A3B4C5D6E7F8901ABCDEF25 /* Sources */,
 				2A3B4C5D6E7F8901ABCDEF26 /* Resources */,
 			);
 			buildRules = (
@@ -100,6 +105,9 @@
 			dependencies = (
 			);
 			name = Silento;
+			packageProductDependencies = (
+				D3CEC1F22DEB229E003FD3D9 /* ScreenProtectorKit */,
+			);
 			productName = Silento;
 			productReference = 2A3B4C5D6E7F8901ABCDEF1D /* Silento.app */;
 			productType = "com.apple.product-type.application";
@@ -129,6 +137,9 @@
 				Base,
 			);
 			mainGroup = 2A3B4C5D6E7F8901ABCDEF20;
+			packageReferences = (
+				D3CEC1F32DEB229E003FD3D9 /* XCRemoteSwiftPackageReference "ScreenProtectorKit" */,
+			);
 			productRefGroup = 2A3B4C5D6E7F8901ABCDEF22 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -150,12 +161,16 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		2A3B4C5D6E7F8901ABCDEF25 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				D3CEC1A22DEB1FAA003FD3D9 /* SilentoApp.swift in Sources */,
+				D3CEC1A32DEB1FAA003FD3D9 /* AppDelegate.swift in Sources */,
 				D3CEC1E82DEB229E003FD3D9 /* HomeView.swift in Sources */,
 				D3CEC1EA2DEB229E003FD3D9 /* ParticleBackgroundView.swift in Sources */,
 				D3CEC1EB2DEB229E003FD3D9 /* CreateRoomView.swift in Sources */,
@@ -302,6 +317,7 @@
 		};
 		2A3B4C5D6E7F8901ABCDEF2B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 58008660CF0F96E9514AE980 /* Pods-Silento.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -331,6 +347,7 @@
 		};
 		2A3B4C5D6E7F8901ABCDEF2C /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9DFB1D29C22A355F29685320 /* Pods-Silento.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -379,6 +396,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D3CEC1F32DEB229E003FD3D9 /* XCRemoteSwiftPackageReference "ScreenProtectorKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/prongbang/ScreenProtectorKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D3CEC1F22DEB229E003FD3D9 /* ScreenProtectorKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3CEC1F32DEB229E003FD3D9 /* XCRemoteSwiftPackageReference "ScreenProtectorKit" */;
+			productName = ScreenProtectorKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2A3B4C5D6E7F8901ABCDEF27 /* Project object */;
 }

@@ -1,0 +1,15 @@
+{
+  "originHash" : "33bbe41331390e2c2568f1b877c91462f9f9ea2bbc2c57c863202c431f778b76",
+  "pins" : [
+    {
+      "identity" : "screenprotectorkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/prongbang/ScreenProtectorKit.git",
+      "state" : {
+        "revision" : "eed4217449b0312156c6483fccc0f2b54a45be90",
+        "version" : "1.3.1"
+      }
+    }
+  ],
+  "version" : 3
+}
