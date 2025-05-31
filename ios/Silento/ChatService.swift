@@ -1,32 +1,57 @@
 import Foundation
 import SwiftUI
+import Network
+import CryptoKit
 
 class ChatService: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var peers: [String] = []
     @Published var isConnected = false
     @Published var connectionStatus: ConnectionStatus = .disconnected
+    @Published var isCreatingRoom = false
+    @Published var isJoiningRoom = false
     
-    private var webSocketTask: URLSessionWebSocketTask?
-    private let clientId = UUID().uuidString
-    private var currentServerURL: String?
-    
-    enum ConnectionStatus {
-        case disconnected
-        case connecting
-        case connected
-        case failed
-        case error(String)
+    enum ConnectionStatus: String, CaseIterable {
+        case disconnected = "Disconnected"
+        case connecting = "Connecting..."
+        case connected = "Connected"
+        case failed = "Connection Failed"
+        case roomCreating = "Creating Room..."
+        case roomJoining = "Joining Room..."
     }
     
-    // Server discovery - production servers only
+    private var webSocketTask: URLSessionWebSocketTask?
+    private var urlSession: URLSession
+    var currentRoomId: String?
+    private var currentServerURL: String?
+    private var clientId: String
+    private var encryptionKey: SymmetricKey?
+    
+    // Server discovery - Railway production server (much better than Render!)
     private let serverURLs = [
-        "https://silento-backend.onrender.com"   // Production API server
+        "https://silento-back-production.up.railway.app"   // Railway production server
     ]
     
     init() {
-        connectionStatus = .connecting
-        discoverServer { }
+        self.clientId = UUID().uuidString
+        
+        // Create URLSession with custom configuration for better connectivity
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 60.0
+        config.timeoutIntervalForResource = 300.0
+        config.waitsForConnectivity = true
+        config.allowsCellularAccess = true
+        config.httpMaximumConnectionsPerHost = 10
+        
+        // Force HTTP/1.1 to avoid QUIC connection issues
+        config.protocolClasses = []
+        
+        self.urlSession = URLSession(configuration: config)
+        
+        // Generate encryption key for this session
+        self.encryptionKey = SymmetricKey(size: .bits256)
+        
+        print("🆔 Client ID: \(clientId)")
     }
     
     // MARK: - Server Discovery
@@ -190,65 +215,167 @@ class ChatService: ObservableObject {
     // MARK: - Room Management
     
     func createRoom(completion: @escaping (Result<String, Error>) -> Void) {
-        guard let serverURL = currentServerURL else {
-            completion(.failure(NSError(domain: "NoServer", code: 0, userInfo: [NSLocalizedDescriptionKey: "No server available"])))
+        // Prevent multiple simultaneous room creation attempts
+        guard !isCreatingRoom else {
+            print("🚫 Room creation already in progress")
             return
         }
         
-        guard let url = URL(string: "\(serverURL)/api/create-room") else {
-            completion(.failure(NSError(domain: "InvalidURL", code: 0, userInfo: nil)))
-            return
-        }
+        isCreatingRoom = true
+        connectionStatus = .roomCreating
         
-        print("🚀 Creating room at: \(url)")
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body = ["clientId": clientId]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        print("📤 Request body: \(body)")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ Network error: \(error.localizedDescription)")
+        Task {
+            await MainActor.run {
+                isCreatingRoom = true
+                connectionStatus = .roomCreating
+            }
+            
+            do {
+                let roomId = try await performCreateRoom()
+                await MainActor.run {
+                    self.isCreatingRoom = false
+                    completion(.success(roomId))
+                }
+            } catch {
+                await MainActor.run {
+                    self.isCreatingRoom = false
+                    self.connectionStatus = .failed
                     completion(.failure(error))
-                    return
+                }
+            }
+        }
+    }
+    
+    private func performCreateRoom() async throws -> String {
+        for serverURL in serverURLs {
+            print("🔍 Testing server: \(serverURL)")
+            
+            do {
+                // Test server connectivity first
+                guard let healthURL = URL(string: "\(serverURL)/health") else {
+                    throw NetworkError.invalidURL
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("📡 HTTP Status: \(httpResponse.statusCode)")
+                let (_, response) = try await urlSession.data(from: healthURL)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    continue
                 }
                 
-                guard let data = data else {
-                    print("❌ No response data")
-                    completion(.failure(NSError(domain: "NoData", code: 0, userInfo: [NSLocalizedDescriptionKey: "No response data"])))
-                    return
+                print("📡 Server \(serverURL) responded with status: \(httpResponse.statusCode)")
+                print("✅ Server \(serverURL) is working!")
+                
+                await MainActor.run {
+                    connectionStatus = .connecting
                 }
                 
-                print("📥 Response data: \(String(data: data, encoding: .utf8) ?? "nil")")
-                
-                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    print("❌ Failed to parse JSON")
-                    completion(.failure(NSError(domain: "InvalidJSON", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to parse JSON response"])))
-                    return
+                // Create room
+                guard let createURL = URL(string: "\(serverURL)/api/create-room") else {
+                    throw NetworkError.invalidURL
                 }
                 
-                print("📋 Parsed JSON: \(json)")
+                print("🚀 Creating room at: \(createURL)")
                 
-                guard let roomId = json["roomId"] as? String else {
-                    print("❌ No roomId in response")
-                    completion(.failure(NSError(domain: "InvalidResponse", code: 0, userInfo: [NSLocalizedDescriptionKey: "No roomId in response"])))
-                    return
+                var request = URLRequest(url: createURL)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                
+                let body = ["clientId": clientId]
+                let bodyData = try JSONSerialization.data(withJSONObject: body)
+                request.httpBody = bodyData
+                
+                print("📤 Request body: \(body)")
+                
+                let (data, createResponse) = try await urlSession.data(for: request)
+                
+                guard let httpCreateResponse = createResponse as? HTTPURLResponse else {
+                    throw NetworkError.invalidResponse
+                }
+                
+                print("📡 HTTP Status: \(httpCreateResponse.statusCode)")
+                print("📥 Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                guard httpCreateResponse.statusCode == 200 else {
+                    throw NetworkError.serverError(httpCreateResponse.statusCode)
+                }
+                
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                print("📋 Parsed JSON: \(json ?? [:])")
+                
+                guard let roomId = json?["roomId"] as? String else {
+                    throw NetworkError.noRoomId
                 }
                 
                 print("✅ Room created successfully: \(roomId)")
-                completion(.success(roomId))
+                
+                // Connect to WebSocket
+                try await connectToWebSocket(serverURL: serverURL, roomId: roomId)
+                
+                return roomId
+                
+            } catch {
+                print("❌ Server \(serverURL) failed: \(error)")
+                continue
             }
-        }.resume()
+        }
+        
+        throw NetworkError.allServersFailed
+    }
+    
+    private func connectToWebSocket(serverURL: String, roomId: String) async throws {
+        // Prevent multiple simultaneous connections
+        if webSocketTask != nil {
+            print("🔄 Closing existing WebSocket connection")
+            webSocketTask?.cancel()
+            webSocketTask = nil
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+        }
+        
+        currentRoomId = roomId
+        
+        guard let wsURL = URL(string: serverURL.replacingOccurrences(of: "https://", with: "wss://") + "/ws") else {
+            throw NetworkError.invalidURL
+        }
+        
+        print("🔌 Connecting to WebSocket: \(wsURL)")
+        
+        await MainActor.run {
+            connectionStatus = .connecting
+        }
+        
+        var request = URLRequest(url: wsURL)
+        request.timeoutInterval = 30.0
+        request.setValue("13", forHTTPHeaderField: "Sec-WebSocket-Version")
+        request.setValue("websocket", forHTTPHeaderField: "Upgrade")
+        request.setValue("Upgrade", forHTTPHeaderField: "Connection")
+        
+        webSocketTask = urlSession.webSocketTask(with: request)
+        webSocketTask?.resume()
+        
+        print("⏳ Waiting for WebSocket connection...")
+        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+        
+        // Send initial room join message
+        let initMessage = [
+            "type": "init",
+            "roomId": roomId,
+            "clientId": clientId
+        ]
+        
+        print("📡 Sending WebSocket init message for room: \(roomId)")
+        try await sendWebSocketMessage(initMessage)
+        
+        await MainActor.run {
+            isConnected = true
+            connectionStatus = .connected
+        }
+        
+        print("✅ WebSocket connected and listening")
+        
+        // Start listening for messages
+        Task {
+            listenForMessages()
+        }
     }
     
     func joinRoom(_ roomId: String, completion: @escaping (Result<Bool, Error>) -> Void) {
@@ -286,13 +413,15 @@ class ChatService: ObservableObject {
     }
     
     func connectToRoom(roomId: String) {
-        // Clear previous messages
-        messages.removeAll()
-        peers.removeAll()
-        
-        // Connect to WebSocket
-        Task {
-            await connectWebSocket(roomId: roomId)
+        // This method is now redundant since we use the async createRoom flow
+        // Just delegate to the createRoom if needed for compatibility
+        createRoom { result in
+            switch result {
+            case .success(let createdRoomId):
+                print("✅ Connected to room: \(createdRoomId)")
+            case .failure(let error):
+                print("❌ Failed to connect to room: \(error)")
+            }
         }
     }
     
@@ -406,6 +535,7 @@ class ChatService: ObservableObject {
                         let fileSize = json["fileSize"] as? Int
                         
                         let chatMessage = ChatMessage(
+                            id: UUID().uuidString,
                             content: content,
                             type: messageType,
                             isFromCurrentUser: false,
@@ -476,87 +606,367 @@ class ChatService: ObservableObject {
     // MARK: - Public Methods
     
     func sendMessage(_ content: String) {
-        print("📤 Sending message: '\(content)'")
-        print("🔗 WebSocket connected: \(isConnected)")
-        print("👥 Current peers: \(peers)")
-        
-        // Immediately add message to local state with "sending" status
-        let localMessage = ChatMessage(
+        let message = ChatMessage(
+            id: UUID().uuidString,
             content: content,
             type: .text,
             isFromCurrentUser: true,
+            timestamp: Date(),
             senderId: clientId,
             status: .sending
         )
         
-        print("💾 Adding local message to UI: \(localMessage.id)")
+        // Add to local messages immediately
         DispatchQueue.main.async {
-            self.messages.append(localMessage)
-            print("📊 Total messages now: \(self.messages.count)")
-        }
-        
-        // Check WebSocket connection
-        guard webSocketTask != nil else {
-            print("❌ WebSocket task is nil")
-            updateMessageStatus(localMessage.id, to: .failed)
-            return
+            self.messages.append(message)
+            print("💾 Adding local message to UI: \(message.id)")
         }
         
         // Send via WebSocket
-        let message = WebSocketMessage(
-            type: "message",
-            content: content,
-            clientId: clientId,
-            messageType: "text"
-        )
-        
-        guard let data = try? JSONEncoder().encode(message),
-              let text = String(data: data, encoding: .utf8) else {
-            print("❌ Failed to encode message")
-            updateMessageStatus(localMessage.id, to: .failed)
+        Task {
+            await sendMessageViaWebSocket(message)
+        }
+    }
+    
+    private func sendMessageViaWebSocket(_ message: ChatMessage) async {
+        guard isConnected else {
+            print("❌ Cannot send message: not connected")
+            await MainActor.run {
+                updateMessageStatus(messageId: message.id, status: .failed)
+            }
             return
         }
         
-        print("📡 Sending WebSocket message: \(text)")
+        print("📤 Sending message: '\(message.content)'")
+        print("🔗 WebSocket connected: \(isConnected)")
+        print("👥 Current peers: \(peers)")
         
-        webSocketTask?.send(.string(text)) { [weak self] error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ Failed to send message: \(error.localizedDescription)")
-                    self?.updateMessageStatus(localMessage.id, to: .failed)
-                } else {
-                    print("✅ Message sent successfully via WebSocket")
-                    self?.updateMessageStatus(localMessage.id, to: .sent)
+        do {
+            // Encrypt message content if encryption is enabled
+            let encryptedContent = try encryptMessage(message.content)
+            
+            let webSocketMessage: [String: Any] = [
+                "type": "message",
+                "messageType": message.type.rawValue,
+                "content": encryptedContent,
+                "mediaURL": message.mediaURL ?? "",
+                "fileName": message.fileName ?? "",
+                "clientId": clientId
+            ]
+            
+            try await sendWebSocketMessage(webSocketMessage)
+            
+            await MainActor.run {
+                updateMessageStatus(messageId: message.id, status: .sent)
+            }
+            
+        } catch {
+            print("❌ Failed to send message: \(error)")
+            await MainActor.run {
+                updateMessageStatus(messageId: message.id, status: .failed)
+            }
+        }
+    }
+    
+    private func encryptMessage(_ content: String) throws -> String {
+        guard let encryptionKey = encryptionKey else {
+            return content // Return unencrypted if no key
+        }
+        
+        let data = content.data(using: .utf8)!
+        let sealedBox = try AES.GCM.seal(data, using: encryptionKey)
+        return sealedBox.combined!.base64EncodedString()
+    }
+    
+    private func decryptMessage(_ encryptedContent: String) throws -> String {
+        guard let encryptionKey = encryptionKey,
+              let encryptedData = Data(base64Encoded: encryptedContent) else {
+            return encryptedContent // Return as-is if can't decrypt
+        }
+        
+        let sealedBox = try AES.GCM.SealedBox(combined: encryptedData)
+        let decryptedData = try AES.GCM.open(sealedBox, using: encryptionKey)
+        return String(data: decryptedData, encoding: .utf8) ?? encryptedContent
+    }
+    
+    private func sendWebSocketMessage(_ message: [String: Any]) async throws {
+        let data = try JSONSerialization.data(withJSONObject: message)
+        let text = String(data: data, encoding: .utf8)!
+        
+        print("📡 Sending WebSocket message: \(message)")
+        
+        try await webSocketTask?.send(.string(text))
+    }
+    
+    private func listenForMessages() {
+        webSocketTask?.receive { [weak self] result in
+            switch result {
+            case .success(let message):
+                switch message {
+                case .string(let text):
+                    print("📥 Received WebSocket message: \(text)")
+                    Task {
+                        await self?.handleWebSocketMessage(text)
+                    }
+                case .data(let data):
+                    if let text = String(data: data, encoding: .utf8) {
+                        print("📥 Received WebSocket data as text: \(text)")
+                        Task {
+                            await self?.handleWebSocketMessage(text)
+                        }
+                    }
+                @unknown default:
+                    break
+                }
+                // Continue listening
+                self?.listenForMessages()
+            case .failure(let error):
+                print("❌ WebSocket receive error: \(error)")
+                DispatchQueue.main.async {
+                    self?.connectionStatus = .failed
+                    self?.isConnected = false
                 }
             }
         }
     }
     
-    private func updateMessageStatus(_ messageId: String, to status: MessageStatus) {
+    private func handleWebSocketMessage(_ text: String) async {
+        do {
+            guard let data = text.data(using: .utf8),
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let type = json["type"] as? String else {
+                print("❌ Failed to parse WebSocket message")
+                return
+            }
+            
+            print("📋 Parsed message type: \(type)")
+            
+            switch type {
+            case "init-success":
+                if let peers = json["peers"] as? [String] {
+                    await MainActor.run {
+                        self.peers = peers
+                        isConnected = true
+                        connectionStatus = .connected
+                    }
+                    print("✅ Room joined successfully with \(peers.count) peers")
+                }
+                
+            case "message":
+                guard let content = json["content"] as? String,
+                      let senderId = json["clientId"] as? String,
+                      let messageTypeString = json["messageType"] as? String else {
+                    print("❌ Invalid message format")
+                    return
+                }
+                
+                // Skip messages from ourselves
+                guard senderId != clientId else {
+                    print("📤 Skipping own message")
+                    return
+                }
+                
+                // Decrypt message content
+                let decryptedContent = (try? decryptMessage(content)) ?? content
+                
+                let messageType = MessageType(rawValue: messageTypeString) ?? .text
+                let mediaURL = json["mediaURL"] as? String
+                let fileName = json["fileName"] as? String
+                
+                let chatMessage = ChatMessage(
+                    id: UUID().uuidString,
+                    content: decryptedContent,
+                    type: messageType,
+                    isFromCurrentUser: false,
+                    timestamp: Date(),
+                    senderId: senderId,
+                    status: .delivered,
+                    mediaURL: mediaURL?.isEmpty == false ? mediaURL : nil,
+                    fileName: fileName?.isEmpty == false ? fileName : nil
+                )
+                
+                await MainActor.run {
+                    // Check for duplicates
+                    let isDuplicate = messages.contains { existingMessage in
+                        existingMessage.content == chatMessage.content &&
+                        existingMessage.isFromCurrentUser == chatMessage.isFromCurrentUser &&
+                        abs(existingMessage.timestamp.timeIntervalSince(chatMessage.timestamp)) < 1.0
+                    }
+                    
+                    if !isDuplicate {
+                        messages.append(chatMessage)
+                        print("📥 Added incoming message: \(chatMessage.content)")
+                    } else {
+                        print("🔄 Skipped duplicate message: \(chatMessage.content)")
+                    }
+                }
+                
+            case "peer-joined":
+                if let peerId = json["clientId"] as? String, peerId != clientId {
+                    await MainActor.run {
+                        if !peers.contains(peerId) {
+                            peers.append(peerId)
+                        }
+                    }
+                    print("👋 Peer joined: \(peerId)")
+                }
+                
+            case "peer-left":
+                if let peerId = json["clientId"] as? String {
+                    await MainActor.run {
+                        peers.removeAll { $0 == peerId }
+                    }
+                    print("👋 Peer left: \(peerId)")
+                }
+                
+            default:
+                print("❓ Unknown message type: \(type)")
+            }
+            
+        } catch {
+            print("❌ Error handling WebSocket message: \(error)")
+        }
+    }
+    
+    private func updateMessageStatus(messageId: String, status: MessageStatus) {
         if let index = messages.firstIndex(where: { $0.id == messageId }) {
-            let updatedMessage = messages[index]
-            // Create new message with updated status (since ChatMessage properties are let)
-            let newMessage = ChatMessage(
-                id: updatedMessage.id,
-                content: updatedMessage.content,
-                type: updatedMessage.type,
-                isFromCurrentUser: updatedMessage.isFromCurrentUser,
-                timestamp: updatedMessage.timestamp,
-                senderId: updatedMessage.senderId,
-                status: status,
-                mediaURL: updatedMessage.mediaURL,
-                fileName: updatedMessage.fileName,
-                fileSize: updatedMessage.fileSize
-            )
-            messages[index] = newMessage
+            messages[index].status = status
+        }
+    }
+    
+    func disconnect() {
+        webSocketTask?.cancel()
+        webSocketTask = nil
+        isConnected = false
+        connectionStatus = .disconnected
+        peers.removeAll()
+        messages.removeAll()
+        currentRoomId = nil
+        print("🔌 Disconnected from chat service")
+    }
+    
+    deinit {
+        disconnect()
+    }
+    
+    private func performFileUpload(data: Data, fileName: String, mimeType: String) async throws -> String {
+        guard let serverURL = serverURLs.first,
+              let uploadURL = URL(string: "\(serverURL)/api/upload") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        let (responseData, response) = try await urlSession.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        
+        let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        guard let fileURL = json?["url"] as? String else {
+            throw NetworkError.noFileURL
+        }
+        
+        return serverURL + fileURL
+    }
+    
+    func sendMediaMessage(fileURL: String, fileName: String, mimeType: String) {
+        let messageType: MessageType
+        if mimeType.starts(with: "image/") {
+            messageType = .image
+        } else if mimeType.starts(with: "video/") {
+            messageType = .video
+        } else if mimeType.starts(with: "audio/") {
+            messageType = .audio
+        } else {
+            messageType = .file
+        }
+        
+        let message = ChatMessage(
+            id: UUID().uuidString,
+            content: fileName,
+            type: messageType,
+            isFromCurrentUser: true,
+            timestamp: Date(),
+            senderId: clientId,
+            status: .sending,
+            mediaURL: fileURL,
+            fileName: fileName
+        )
+        
+        DispatchQueue.main.async {
+            self.messages.append(message)
+        }
+        
+        Task {
+            await sendMessageViaWebSocket(message)
+        }
+    }
+    
+    func uploadFile(_ data: Data, fileName: String, mimeType: String, completion: @escaping (Result<String, Error>) -> Void) {
+        Task {
+            do {
+                let fileURL = try await performFileUpload(data: data, fileName: fileName, mimeType: mimeType)
+                completion(.success(fileURL))
+            } catch NetworkError.serverError(404) {
+                // Server doesn't support uploads yet - provide helpful error message
+                completion(.failure(UploadError.serverNotReady))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    private func sendInitMessage(roomId: String) {
+        print("📡 Sending WebSocket init message for room: \(roomId)")
+        
+        let initMessage = WebSocketMessage(
+            type: "init",
+            clientId: clientId,
+            roomId: roomId
+        )
+        
+        guard let data = try? JSONEncoder().encode(initMessage),
+              let text = String(data: data, encoding: .utf8) else {
+            print("❌ Failed to encode init message")
+            return
+        }
+        
+        webSocketTask?.send(.string(text)) { error in
+            if let error = error {
+                print("❌ Failed to send init message: \(error)")
+                DispatchQueue.main.async {
+                    self.connectionStatus = .failed
+                }
+            }
         }
     }
     
     func leaveRoom() {
         webSocketTask?.cancel()
+        webSocketTask = nil
         isConnected = false
-        messages.removeAll()
+        connectionStatus = .disconnected
         peers.removeAll()
+        messages.removeAll()
+        currentRoomId = nil
+        currentServerURL = nil
+        print("🔌 Left room and disconnected")
     }
 }
 
@@ -584,7 +994,7 @@ struct ChatMessage: Identifiable, Codable {
     let isFromCurrentUser: Bool
     let timestamp: Date
     let senderId: String
-    let status: MessageStatus
+    var status: MessageStatus
     let mediaURL: String?
     let fileName: String?
     let fileSize: Int?
@@ -622,5 +1032,45 @@ struct WebSocketMessage: Codable {
         self.mediaURL = mediaURL
         self.fileName = fileName
         self.fileSize = fileSize
+    }
+}
+
+// MARK: - Supporting Types
+extension ChatService {
+    enum NetworkError: LocalizedError {
+        case invalidURL
+        case invalidResponse
+        case noRoomId
+        case noFileURL
+        case serverError(Int)
+        case allServersFailed
+        
+        var errorDescription: String? {
+            switch self {
+            case .invalidURL:
+                return "Invalid server URL"
+            case .invalidResponse:
+                return "Invalid server response"
+            case .noRoomId:
+                return "No room ID received from server"
+            case .noFileURL:
+                return "No file URL received from server"
+            case .serverError(let code):
+                return "Server error: \(code)"
+            case .allServersFailed:
+                return "All servers failed to respond"
+            }
+        }
+    }
+    
+    enum UploadError: LocalizedError {
+        case serverNotReady
+        
+        var errorDescription: String? {
+            switch self {
+            case .serverNotReady:
+                return "File upload feature is still deploying. Please try again in a few minutes."
+            }
+        }
     }
 } 

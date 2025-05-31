@@ -276,4 +276,4 @@ struct MessageTextFieldStyle: TextFieldStyle {
         clientId: "client-123",
         onLeave: {}
     )
-} 
+}  

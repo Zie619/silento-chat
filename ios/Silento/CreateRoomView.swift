@@ -5,9 +5,27 @@ struct CreateRoomView: View {
     let onRoomCreated: (String) -> Void
     let onBack: () -> Void
     
-    @State private var isCreatingRoom = false
     @State private var errorMessage: String?
     @State private var showError = false
+    
+    private var isCreatingRoom: Bool {
+        chatService.isCreatingRoom || chatService.connectionStatus == .roomCreating || chatService.connectionStatus == .connecting
+    }
+    
+    private var statusText: String {
+        switch chatService.connectionStatus {
+        case .roomCreating:
+            return "Creating Room..."
+        case .connecting:
+            return "Connecting..."
+        case .connected:
+            return "Connected!"
+        case .failed:
+            return "Connection Failed"
+        default:
+            return isCreatingRoom ? "Creating Room..." : "Create Room"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 40) {
@@ -19,6 +37,7 @@ struct CreateRoomView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                     }
+                    .disabled(isCreatingRoom)
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -33,7 +52,7 @@ struct CreateRoomView: View {
             
             // Main content
             VStack(spacing: 32) {
-                // Icon
+                // Icon with status indicator
                 VStack(spacing: 20) {
                     ZStack {
                         Circle()
@@ -46,32 +65,107 @@ struct CreateRoomView: View {
                             )
                             .frame(width: 120, height: 120)
                         
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white)
+                        if isCreatingRoom {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                        } else {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white)
+                        }
                     }
                     
                     VStack(spacing: 8) {
-                        Text("Start New Conversation")
+                        Text(isCreatingRoom ? "Setting Up Your Room" : "Start New Conversation")
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
                         
-                        Text("Create a secure room for anonymous messaging")
-                            .font(.body)
-                            .foregroundColor(.white.opacity(0.7))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 20)
+                        if isCreatingRoom {
+                            Text("Establishing secure connection...")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                        } else {
+                            Text("Create a secure room for anonymous messaging")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                        }
+                        
+                        // Connection status
+                        if isCreatingRoom {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 8, height: 8)
+                                    .opacity(0.7)
+                                    .scaleEffect(chatService.connectionStatus == .connecting ? 1.2 : 1.0)
+                                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: chatService.connectionStatus)
+                                
+                                Text(chatService.connectionStatus.rawValue)
+                                    .font(.caption)
+                                    .foregroundColor(.blue.opacity(0.8))
+                            }
+                            .padding(.top, 8)
+                        }
                     }
                 }
                 
                 // Features
-                VStack(spacing: 16) {
-                    FeatureRow(icon: "🔒", title: "End-to-End Encryption", description: "Your messages are completely secure")
-                    FeatureRow(icon: "👥", title: "Multi-User Support", description: "Share the room ID with others")
-                    FeatureRow(icon: "🗑️", title: "Auto-Delete", description: "Messages disappear automatically")
+                if !isCreatingRoom {
+                    VStack(spacing: 16) {
+                        FeatureRow(icon: "🔒", title: "End-to-End Encryption", description: "Your messages are completely secure")
+                        FeatureRow(icon: "👥", title: "Multi-User Support", description: "Share the room ID with others")
+                        FeatureRow(icon: "🗑️", title: "Auto-Delete", description: "Messages disappear automatically")
+                    }
+                    .padding(.horizontal, 20)
+                    .transition(.opacity.combined(with: .scale))
+                } else {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "shield.checkered")
+                                .foregroundColor(.green)
+                            Text("Encryption: AES-256 Enabled")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                            Spacer()
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "server.rack")
+                                .foregroundColor(.blue)
+                            Text("Server: Railway Production")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                            Spacer()
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "network")
+                                .foregroundColor(.orange)
+                            Text("Protocol: WebSocket Secure (WSS)")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                            Spacer()
+                        }
+                        
+                        if chatService.connectionStatus == .connecting {
+                            HStack(spacing: 12) {
+                                Image(systemName: "wifi")
+                                    .foregroundColor(.cyan)
+                                Text("Establishing connection...")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                                Spacer()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .transition(.opacity.combined(with: .scale))
                 }
-                .padding(.horizontal, 20)
             }
             
             Spacer()
@@ -89,17 +183,17 @@ struct CreateRoomView: View {
                                 .font(.title3)
                         }
                         
-                        Text(isCreatingRoom ? "Creating Room..." : "Create Room")
+                        Text(statusText)
                             .font(.headline)
                             .fontWeight(.semibold)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(isCreatingRoom ? .gray : .blue)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .fill(Color.white)
-                            .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 4)
+                            .shadow(color: isCreatingRoom ? .gray.opacity(0.3) : .blue.opacity(0.3), radius: 10, x: 0, y: 4)
                     )
                 }
                 .disabled(isCreatingRoom)
@@ -123,16 +217,23 @@ struct CreateRoomView: View {
                 Text(errorMessage)
             }
         }
+        .onChange(of: chatService.connectionStatus) { status in
+            if status == .connected {
+                // Small delay to show connected state
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if let roomId = chatService.currentRoomId {
+                        onRoomCreated(roomId)
+                    }
+                }
+            }
+        }
     }
     
     private func createRoom() {
-        isCreatingRoom = true
         errorMessage = nil
         
         chatService.createRoom { result in
             DispatchQueue.main.async {
-                isCreatingRoom = false
-                
                 switch result {
                 case .success(let roomId):
                     onRoomCreated(roomId)

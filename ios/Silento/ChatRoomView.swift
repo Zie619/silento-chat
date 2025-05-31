@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 struct ChatRoomView: View {
     @ObservedObject var chatService: ChatService
@@ -10,10 +11,16 @@ struct ChatRoomView: View {
     @State private var messageText = ""
     @State private var showRoomInfo = false
     @State private var showLeaveAlert = false
-    @State private var showMediaPicker = false
-    @State private var showCamera = false
+    @State private var showImagePicker = false
     @State private var showDocumentPicker = false
+    @State private var showMediaOptions = false
+    @State private var imagePickerSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var selectedImage: UIImage?
     @State private var isRecordingAudio = false
+    @State private var audioRecorder: AVAudioRecorder?
+    @State private var audioSession = AVAudioSession.sharedInstance()
+    @State private var recordingTimer: Timer?
+    @State private var recordingDuration: TimeInterval = 0
     @FocusState private var isMessageFieldFocused: Bool
     
     var body: some View {
@@ -69,10 +76,11 @@ struct ChatRoomView: View {
                 isMessageFieldFocused: $isMessageFieldFocused,
                 onSend: sendMessage,
                 onAttachmentTap: {
-                    showMediaPicker = true
+                    showMediaOptions = true
                 },
                 onCameraTap: {
-                    showCamera = true
+                    imagePickerSourceType = .camera
+                    showImagePicker = true
                 },
                 onVoiceTap: toggleAudioRecording,
                 isRecording: isRecordingAudio
@@ -87,21 +95,34 @@ struct ChatRoomView: View {
                 connectionStatus: chatService.connectionStatus
             )
         }
-        .actionSheet(isPresented: $showMediaPicker) {
-            ActionSheet(
-                title: Text("Choose Media"),
-                buttons: [
-                    .default(Text("Photo Library")) {
-                        // Will implement photo picker
-                    },
-                    .default(Text("Camera")) {
-                        showCamera = true
-                    },
-                    .default(Text("Document")) {
-                        showDocumentPicker = true
-                    },
-                    .cancel()
-                ]
+        .confirmationDialog("Choose Media", isPresented: $showMediaOptions, titleVisibility: .visible) {
+            Button("Photo Library") {
+                imagePickerSourceType = .photoLibrary
+                showImagePicker = true
+            }
+            
+            Button("Camera") {
+                imagePickerSourceType = .camera
+                showImagePicker = true
+            }
+            
+            Button("Document") {
+                showDocumentPicker = true
+            }
+            
+            Button("Cancel", role: .cancel) { }
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePickerView(
+                sourceType: imagePickerSourceType,
+                selectedImage: $selectedImage,
+                isPresented: $showImagePicker
+            )
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPickerView(
+                isPresented: $showDocumentPicker,
+                onDocumentSelected: handleDocumentSelection
             )
         }
         .alert("Leave Room", isPresented: $showLeaveAlert) {
@@ -111,6 +132,12 @@ struct ChatRoomView: View {
             }
         } message: {
             Text("Are you sure you want to leave this room? Your messages will be lost.")
+        }
+        .onChange(of: selectedImage) { image in
+            if let image = image {
+                handleImageSelection(image)
+                selectedImage = nil
+            }
         }
         .onTapGesture {
             isMessageFieldFocused = false
@@ -128,7 +155,192 @@ struct ChatRoomView: View {
     
     private func toggleAudioRecording() {
         isRecordingAudio.toggle()
-        // TODO: Implement audio recording
+        
+        if isRecordingAudio {
+            startAudioRecording()
+        } else {
+            stopAudioRecording()
+        }
+    }
+    
+    private func startAudioRecording() {
+        print("🎤 Starting audio recording...")
+        
+        do {
+            // Configure audio session
+            try audioSession.setCategory(.record, mode: .default)
+            try audioSession.setActive(true)
+            
+            // Check microphone permission
+            audioSession.requestRecordPermission { allowed in
+                DispatchQueue.main.async {
+                    if allowed {
+                        self.beginRecording()
+                    } else {
+                        print("❌ Microphone permission denied")
+                        self.isRecordingAudio = false
+                    }
+                }
+            }
+        } catch {
+            print("❌ Failed to setup audio session: \(error)")
+            isRecordingAudio = false
+        }
+    }
+    
+    private func beginRecording() {
+        let audioFilename = getDocumentsDirectory().appendingPathComponent("recording_\(Date().timeIntervalSince1970).m4a")
+        
+        let settings = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        
+        do {
+            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder?.record()
+            
+            // Start timer for recording duration
+            recordingDuration = 0
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                recordingDuration += 0.1
+            }
+            
+            print("🎤 Recording started...")
+        } catch {
+            print("❌ Could not start recording: \(error)")
+            isRecordingAudio = false
+        }
+    }
+    
+    private func stopAudioRecording() {
+        print("🎤 Stopping audio recording...")
+        
+        audioRecorder?.stop()
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+        
+        do {
+            try audioSession.setActive(false)
+        } catch {
+            print("❌ Error deactivating audio session: \(error)")
+        }
+        
+        // Handle the recorded audio file
+        if let audioURL = audioRecorder?.url {
+            handleAudioRecording(audioURL)
+        } else {
+            print("❌ No audio file recorded")
+        }
+    }
+    
+    private func handleAudioRecording(_ audioURL: URL) {
+        do {
+            let audioData = try Data(contentsOf: audioURL)
+            let fileName = "audio_\(Date().timeIntervalSince1970).m4a"
+            let durationText = String(format: "%.1f", recordingDuration)
+            
+            // Show uploading message
+            let uploadingMessage = "🎤 Uploading voice message (\(durationText)s)..."
+            chatService.sendMessage(uploadingMessage)
+            
+            // Upload audio file
+            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/m4a") { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let fileURL):
+                        print("✅ Audio uploaded successfully: \(fileURL)")
+                        // Send audio message
+                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/m4a")
+                        
+                    case .failure(let error):
+                        print("❌ Failed to upload audio: \(error)")
+                        self.chatService.sendMessage("❌ Failed to upload voice message: \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            // Clean up the temporary file
+            try? FileManager.default.removeItem(at: audioURL)
+            
+        } catch {
+            print("❌ Failed to read audio file: \(error)")
+            chatService.sendMessage("❌ Failed to process voice message")
+        }
+    }
+    
+    private func getDocumentsDirectory() -> URL {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        return paths[0]
+    }
+    
+    private func handleImageSelection(_ image: UIImage) {
+        print("📸 Image selected: \(image.size)")
+        
+        // Convert UIImage to JPEG data
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ Failed to convert image to data")
+            return
+        }
+        
+        let fileName = "image_\(Date().timeIntervalSince1970).jpg"
+        
+        // Show uploading message
+        let uploadingMessage = "📸 Uploading image..."
+        chatService.sendMessage(uploadingMessage)
+        
+        // Upload file to server
+        chatService.uploadFile(imageData, fileName: fileName, mimeType: "image/jpeg") { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let fileURL):
+                    print("✅ Image uploaded successfully: \(fileURL)")
+                    // Send media message with actual file URL
+                    self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "image/jpeg")
+                    
+                case .failure(let error):
+                    print("❌ Failed to upload image: \(error)")
+                    // Send error message
+                    self.chatService.sendMessage("❌ Failed to upload image: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func handleDocumentSelection(_ url: URL) {
+        print("📄 Document selected: \(url.lastPathComponent)")
+        
+        do {
+            let documentData = try Data(contentsOf: url)
+            let fileName = url.lastPathComponent
+            let mimeType = "application/octet-stream" // Generic mime type for documents
+            
+            // Show uploading message
+            let uploadingMessage = "📄 Uploading document..."
+            chatService.sendMessage(uploadingMessage)
+            
+            // Upload file to server
+            chatService.uploadFile(documentData, fileName: fileName, mimeType: mimeType) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let fileURL):
+                        print("✅ Document uploaded successfully: \(fileURL)")
+                        // Send media message with actual file URL
+                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: mimeType)
+                        
+                    case .failure(let error):
+                        print("❌ Failed to upload document: \(error)")
+                        // Send error message
+                        self.chatService.sendMessage("❌ Failed to upload document: \(error.localizedDescription)")
+                    }
+                }
+            }
+        } catch {
+            print("❌ Failed to read document: \(error)")
+            chatService.sendMessage("❌ Failed to read document: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -274,23 +486,45 @@ struct MessageBubbleView: View {
                     
             case .image:
                 VStack(alignment: .leading, spacing: 8) {
-                    AsyncImage(url: URL(string: message.mediaURL ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .cornerRadius(12)
-                    } placeholder: {
+                    if let mediaURL = message.mediaURL, let url = URL(string: mediaURL) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .cornerRadius(12)
+                        } placeholder: {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 200, height: 150)
+                                .overlay(
+                                    VStack {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        Text("Loading...")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                )
+                        }
+                        .frame(maxWidth: 250, maxHeight: 200)
+                    } else {
+                        // Fallback for messages without media URL
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.gray.opacity(0.3))
                             .frame(width: 200, height: 150)
                             .overlay(
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                VStack {
+                                    Image(systemName: "photo")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("Image")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
                             )
                     }
-                    .frame(maxWidth: 250, maxHeight: 200)
                     
-                    if !message.content.isEmpty {
+                    if !message.content.isEmpty && !message.content.contains("Uploading") {
                         Text(message.content)
                             .font(.body)
                             .foregroundColor(.white)
@@ -579,6 +813,89 @@ struct RoomInfoView: View {
             }
             .padding()
             .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+// MARK: - Image Picker
+
+struct ImagePickerView: UIViewControllerRepresentable {
+    let sourceType: UIImagePickerController.SourceType
+    @Binding var selectedImage: UIImage?
+    @Binding var isPresented: Bool
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePickerView
+        
+        init(_ parent: ImagePickerView) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let editedImage = info[.editedImage] as? UIImage {
+                parent.selectedImage = editedImage
+            } else if let originalImage = info[.originalImage] as? UIImage {
+                parent.selectedImage = originalImage
+            }
+            
+            parent.isPresented = false
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.isPresented = false
+        }
+    }
+}
+
+// MARK: - Document Picker
+
+struct DocumentPickerView: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    let onDocumentSelected: (URL) -> Void
+    
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: DocumentPickerView
+        
+        init(_ parent: DocumentPickerView) {
+            self.parent = parent
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            if let url = urls.first {
+                parent.onDocumentSelected(url)
+            }
+            parent.isPresented = false
+        }
+        
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.isPresented = false
         }
     }
 }
