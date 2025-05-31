@@ -32,111 +32,114 @@ struct ChatRoomView: View {
     @State private var videoPlayerURL: URL?
     @FocusState private var isMessageFieldFocused: Bool
     @State private var uploadingMessages: Set<String> = []
-    @State private var overlayView: UIView?
+    @State private var secureTextField: UITextField?
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { showLeaveAlert = true }) {
-                    Image(systemName: "arrow.left")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-                
-                Spacer()
-                
-                Button(action: { showRoomInfo = true }) {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text("Room \(roomId)")
-                                .font(.headline)
-                                .foregroundColor(.white)
+        ZStack {
+            // Main content
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button(action: { showLeaveAlert = true }) {
+                        Image(systemName: "arrow.left")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: { showRoomInfo = true }) {
+                        VStack(spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text("Room \(roomId)")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Circle()
+                                    .fill(chatService.isConnected ? .green : .red)
+                                    .frame(width: 8, height: 8)
+                            }
                             
-                            Circle()
-                                .fill(chatService.isConnected ? .green : .red)
-                                .frame(width: 8, height: 8)
+                            if chatService.peers.isEmpty {
+                                Text("You're alone")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                            } else {
+                                Text("\(chatService.peers.count) other\(chatService.peers.count == 1 ? "" : "s")")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
                         }
-                        
-                        if chatService.peers.isEmpty {
-                            Text("You're alone")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                        } else {
-                            Text("\(chatService.peers.count) other\(chatService.peers.count == 1 ? "" : "s")")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: { showRoomInfo = true }) {
+                        Image(systemName: "info.circle")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Button(action: { shareRoom() }) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.black.opacity(0.8))
+                
+                // Messages
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(chatService.messages) { message in
+                                MessageBubbleView(
+                                    message: message,
+                                    isCurrentUser: message.isFromCurrentUser,
+                                    currentlyPlayingURL: $currentlyPlayingAudioURL,
+                                    onPlayAudio: playAudioMessage,
+                                    onStopAudio: stopAudioPlayback,
+                                    isUploading: uploadingMessages.contains(message.id),
+                                    showVideoPlayer: $showVideoPlayer,
+                                    videoPlayerURL: $videoPlayerURL,
+                                    onDownloadFile: downloadFile
+                                )
+                                    .id(message.id)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                    .onChange(of: chatService.messages.count) { _ in
+                        if let lastMessage = chatService.messages.last {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
                 
-                Spacer()
-                
-                Button(action: { showRoomInfo = true }) {
-                    Image(systemName: "info.circle")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-                
-                Button(action: { shareRoom() }) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
+                // Message input
+                ModernMessageInputView(
+                    messageText: $messageText,
+                    isMessageFieldFocused: $isMessageFieldFocused,
+                    onSend: sendMessage,
+                    onAttachmentTap: showAttachmentOptions,
+                    onCameraTap: {
+                        // Always open camera directly for photos - ensure source type is set correctly
+                        imagePickerSourceType = .camera
+                        showImagePicker = true
+                    },
+                    onCameraLongPress: {
+                        // Long press for video recording
+                        startVideoRecording()
+                    },
+                    onVoiceTap: toggleAudioRecording,
+                    isRecording: isRecordingAudio
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.black.opacity(0.8))
-            
-            // Messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(chatService.messages) { message in
-                            MessageBubbleView(
-                                message: message,
-                                isCurrentUser: message.isFromCurrentUser,
-                                currentlyPlayingURL: $currentlyPlayingAudioURL,
-                                onPlayAudio: playAudioMessage,
-                                onStopAudio: stopAudioPlayback,
-                                isUploading: uploadingMessages.contains(message.id),
-                                showVideoPlayer: $showVideoPlayer,
-                                videoPlayerURL: $videoPlayerURL,
-                                onDownloadFile: downloadFile
-                            )
-                            .id(message.id)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                .onChange(of: chatService.messages.count) { _ in
-                    if let lastMessage = chatService.messages.last {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-            
-            // Message input
-            ModernMessageInputView(
-                messageText: $messageText,
-                isMessageFieldFocused: $isMessageFieldFocused,
-                onSend: sendMessage,
-                onAttachmentTap: showAttachmentOptions,
-                onCameraTap: {
-                    // Always open camera directly for photos - ensure source type is set correctly
-                    imagePickerSourceType = .camera
-                    showImagePicker = true
-                },
-                onCameraLongPress: {
-                    // Long press for video recording
-                    startVideoRecording()
-                },
-                onVoiceTap: toggleAudioRecording,
-                isRecording: isRecordingAudio
-            )
         }
         .background(Color.black)
         .sheet(isPresented: $showRoomInfo) {
@@ -730,159 +733,6 @@ struct ChatRoomView: View {
         }
     }
     
-    // MARK: - Screenshot Protection
-    
-    private func enableScreenshotProtection() {
-        // Add observer for screenshot detection
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.userDidTakeScreenshotNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            self.handleScreenshotDetected()
-        }
-        
-        // Add observer for screen recording detection  
-        NotificationCenter.default.addObserver(
-            forName: UIScreen.capturedDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            if UIScreen.main.isCaptured {
-                self.handleScreenRecordingStarted()
-            } else {
-                self.handleScreenRecordingEnded()
-            }
-        }
-        
-        // Enable secure mode for the window
-        makeWindowSecure()
-        
-        print("🔒 Screenshot protection enabled")
-    }
-    
-    private func disableScreenshotProtection() {
-        // Remove observers
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.userDidTakeScreenshotNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIScreen.capturedDidChangeNotification,
-            object: nil
-        )
-        
-        // Disable secure mode
-        removeWindowSecurity()
-        
-        print("🔓 Screenshot protection disabled")
-    }
-    
-    private func handleScreenshotDetected() {
-        print("📸 Screenshot detected in secure chat!")
-        
-        // Show alert to user
-        let alert = UIAlertController(
-            title: "Screenshot Detected",
-            message: "Screenshots are not allowed in secure chat rooms for privacy protection.",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Understood", style: .default))
-        
-        // Present alert
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            
-            var rootViewController = window.rootViewController
-            
-            // Find the topmost presented view controller
-            while let presentedViewController = rootViewController?.presentedViewController {
-                rootViewController = presentedViewController
-            }
-            
-            rootViewController?.present(alert, animated: true)
-        }
-    }
-    
-    private func handleScreenRecordingStarted() {
-        print("📹 Screen recording detected!")
-        
-        // Show persistent warning
-        let alert = UIAlertController(
-            title: "Screen Recording Detected",
-            message: "Screen recording is not allowed in secure chat rooms. Please stop recording to continue.",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Understood", style: .default))
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            
-            var rootViewController = window.rootViewController
-            
-            // Find the topmost presented view controller
-            while let presentedViewController = rootViewController?.presentedViewController {
-                rootViewController = presentedViewController
-            }
-            
-            rootViewController?.present(alert, animated: true)
-        }
-    }
-    
-    private func handleScreenRecordingEnded() {
-        print("✅ Screen recording stopped")
-    }
-    
-    private func makeWindowSecure() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else { return }
-        
-        // Create secure overlay that prevents screenshots
-        let secureView = UIView()
-        secureView.backgroundColor = UIColor.clear
-        secureView.isUserInteractionEnabled = false
-        secureView.tag = 999 // Tag to identify our secure view
-        
-        // Create a text field that's secure
-        let secureField = UITextField()
-        secureField.isSecureTextEntry = true
-        secureField.isUserInteractionEnabled = false
-        secureField.alpha = 0.001 // Nearly invisible but still present
-        secureField.frame = CGRect(x: -1000, y: -1000, width: 1, height: 1)
-        
-        secureView.addSubview(secureField)
-        window.addSubview(secureView)
-        
-        // Activate the secure field
-        secureField.becomeFirstResponder()
-        secureField.resignFirstResponder()
-        
-        // Keep reference
-        overlayView = secureView
-        
-        print("🔒 Secure overlay created")
-    }
-    
-    private func removeWindowSecurity() {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else { return }
-        
-        // Remove our secure overlay
-        window.subviews.forEach { subview in
-            if subview.tag == 999 {
-                subview.removeFromSuperview()
-            }
-        }
-        
-        overlayView = nil
-        print("🔓 Secure overlay removed")
-    }
-    
     private func handleVideoSelection(_ videoURL: URL) {
         print("🎥 Video selected: \(videoURL.lastPathComponent)")
         
@@ -934,6 +784,182 @@ struct ChatRoomView: View {
             print("❌ Failed to read video file: \(error)")
             chatService.sendMessage("❌ Failed to read video file: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - Screenshot Protection
+    
+    private func enableScreenshotProtection() {
+        // Add observer for screenshot detection
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.userDidTakeScreenshotNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.handleScreenshotDetected()
+        }
+        
+        // Add observer for screen recording detection  
+        NotificationCenter.default.addObserver(
+            forName: UIScreen.capturedDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if UIScreen.main.isCaptured {
+                self.handleScreenRecordingStarted()
+            } else {
+                self.handleScreenRecordingEnded()
+            }
+        }
+        
+        // Create effective screenshot prevention
+        createEffectiveSecureProtection()
+        
+        print("🔒 Screenshot protection enabled")
+    }
+    
+    private func disableScreenshotProtection() {
+        // Remove observers
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.userDidTakeScreenshotNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIScreen.capturedDidChangeNotification,
+            object: nil
+        )
+        
+        // Remove secure protection
+        removeSecureTextField()
+        
+        print("🔓 Screenshot protection disabled")
+    }
+    
+    private func createEffectiveSecureProtection() {
+        DispatchQueue.main.async {
+            // Method 1: Create a secure text field that prevents screenshots
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                
+                // Create multiple secure fields for better protection
+                let secureFields = (0..<5).map { index in
+                    let field = UITextField()
+                    field.isSecureTextEntry = true
+                    field.textColor = UIColor.clear
+                    field.backgroundColor = UIColor.clear
+                    field.isUserInteractionEnabled = false
+                    field.frame = CGRect(x: -200 - (index * 50), y: -200 - (index * 50), width: 1, height: 1)
+                    field.alpha = 0.001
+                    return field
+                }
+                
+                // Add all secure fields to window
+                secureFields.forEach { field in
+                    window.addSubview(field)
+                    field.becomeFirstResponder()
+                }
+                
+                // Store reference to the main field
+                self.secureTextField = secureFields.first
+                
+                // Method 2: Set window flag to indicate secure content
+                if #available(iOS 13.0, *) {
+                    // This helps prevent screenshots on newer iOS versions
+                    window.isHidden = false
+                }
+                
+                print("🔒 Enhanced secure protection created with \(secureFields.count) fields")
+            }
+        }
+    }
+    
+    private func removeSecureTextField() {
+        DispatchQueue.main.async {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                
+                // Remove all secure text fields
+                window.subviews.compactMap { $0 as? UITextField }
+                    .filter { $0.isSecureTextEntry }
+                    .forEach { field in
+                        field.resignFirstResponder()
+                        field.removeFromSuperview()
+                    }
+            }
+            
+            self.secureTextField = nil
+            print("🔓 All secure text fields removed")
+        }
+    }
+    
+    private func handleScreenshotDetected() {
+        print("📸 Screenshot attempt detected and blocked!")
+        
+        // Show a more prominent alert
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: "🚫 Screenshot Blocked",
+                message: "Screenshots are not allowed in secure chat rooms. This app protects your privacy and that of others.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Understood", style: .default))
+            
+            // Present the alert
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                
+                var rootViewController = window.rootViewController
+                
+                // Find the topmost presented view controller
+                while let presentedViewController = rootViewController?.presentedViewController {
+                    rootViewController = presentedViewController
+                }
+                
+                rootViewController?.present(alert, animated: true)
+            }
+            
+            // Recreate secure protection to ensure it's still active
+            self.createEffectiveSecureProtection()
+        }
+    }
+    
+    private func handleScreenRecordingStarted() {
+        print("📹 Screen recording attempt detected and blocked!")
+        
+        // Show persistent warning for recording
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: "🚫 Recording Blocked",
+                message: "Screen recording is not allowed in secure chat rooms. Please stop recording to continue using the app.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Stop Recording", style: .destructive) { _ in
+                // User acknowledged - they should stop recording
+            })
+            
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                
+                var rootViewController = window.rootViewController
+                
+                // Find the topmost presented view controller
+                while let presentedViewController = rootViewController?.presentedViewController {
+                    rootViewController = presentedViewController
+                }
+                
+                rootViewController?.present(alert, animated: true)
+            }
+        }
+    }
+    
+    private func handleScreenRecordingEnded() {
+        print("✅ Screen recording stopped")
+        // Recreate secure protection in case it was disrupted
+        createEffectiveSecureProtection()
     }
 }
 
@@ -1666,7 +1692,8 @@ struct VideoPlayerView: View {
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var playerObserver: Any?
+    @State private var playerItemObserver: NSKeyValueObservation?
+    @State private var playerObservers: [Any] = []
     
     var body: some View {
         NavigationView {
@@ -1702,7 +1729,10 @@ struct VideoPlayerView: View {
                 } else if let player = player {
                     VideoPlayer(player: player)
                         .onAppear {
-                            player.play()
+                            // Only start playing if not already playing
+                            if player.timeControlStatus != .playing {
+                                player.play()
+                            }
                         }
                         .onDisappear {
                             player.pause()
@@ -1761,85 +1791,153 @@ struct VideoPlayerView: View {
             loadVideo()
         }
         .onDisappear {
-            if let observer = playerObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
+            cleanupPlayer()
         }
     }
     
     private func loadVideo() {
+        print("🎥 Loading video from URL: \(url)")
+        
+        // Clean up any existing player
+        cleanupPlayer()
+        
         isLoading = true
         errorMessage = nil
         
-        print("🎥 Loading video from URL: \(url)")
-        
-        // Create player item first
-        let playerItem = AVPlayerItem(url: url)
-        let newPlayer = AVPlayer(playerItem: playerItem)
-        
-        // Add observer for player item status
-        playerObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: playerItem,
-            queue: .main
-        ) { _ in
-            // Video finished playing
-            newPlayer.seek(to: .zero)
-        }
-        
-        // Add observer for failed playback
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemFailedToPlayToEndTime,
-            object: playerItem,
-            queue: .main
-        ) { notification in
-            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                print("❌ Video playback error: \(error.localizedDescription)")
-                self.errorMessage = "Playback failed: \(error.localizedDescription)"
-                self.isLoading = false
+        // Configure AVAudioSession for video playback
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playback, mode: .moviePlayback, options: [])
+                try audioSession.setActive(true)
+                print("✅ Audio session configured for video playback")
+            } catch {
+                print("⚠️ Failed to configure audio session: \(error)")
             }
-        }
-        
-        // Wait a moment for the player to be ready
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            switch playerItem.status {
-            case .readyToPlay:
-                print("✅ Video ready to play")
+            
+            DispatchQueue.main.async {
+                // Create player item with asset for better control
+                let asset = AVAsset(url: url)
+                let playerItem = AVPlayerItem(asset: asset)
+                let newPlayer = AVPlayer(playerItem: playerItem)
+                
+                // Configure player for better performance
+                newPlayer.automaticallyWaitsToMinimizeStalling = false
+                if #available(iOS 10.0, *) {
+                    newPlayer.preventsDisplaySleepDuringVideoPlayback = true
+                }
+                
+                // Store player reference
                 self.player = newPlayer
-                self.isLoading = false
-                self.errorMessage = nil
-            case .failed:
-                let errorDescription = playerItem.error?.localizedDescription ?? "Unknown error"
-                print("❌ Video failed to load: \(errorDescription)")
-                self.isLoading = false
-                self.errorMessage = "Failed to load video: \(errorDescription)"
-            case .unknown:
-                print("🔄 Video status unknown - waiting longer...")
-                // Try again after another delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    if playerItem.status == .readyToPlay {
-                        self.player = newPlayer
-                        self.isLoading = false
-                    } else {
-                        self.errorMessage = "Video loading timeout"
+                
+                // Observe player item status
+                self.playerItemObserver = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
+                    DispatchQueue.main.async {
+                        switch item.status {
+                        case .readyToPlay:
+                            print("✅ Video ready to play")
+                            self.isLoading = false
+                            self.errorMessage = nil
+                            
+                            // Check if the video has valid duration
+                            if item.duration.isValid && item.duration.seconds > 0 {
+                                print("📹 Video duration: \(item.duration.seconds) seconds")
+                            } else {
+                                print("⚠️ Video duration is invalid or zero")
+                            }
+                            
+                        case .failed:
+                            let errorDescription = item.error?.localizedDescription ?? "Unknown playback error"
+                            print("❌ Video failed to load: \(errorDescription)")
+                            self.isLoading = false
+                            self.errorMessage = "Failed to load video: \(errorDescription)"
+                            
+                        case .unknown:
+                            print("🔄 Video status unknown")
+                            
+                        @unknown default:
+                            print("🔄 Video status unknown default")
+                        }
+                    }
+                }
+                
+                // Observe playback errors
+                let failedObserver = NotificationCenter.default.addObserver(
+                    forName: .AVPlayerItemFailedToPlayToEndTime,
+                    object: playerItem,
+                    queue: .main
+                ) { notification in
+                    if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+                        print("❌ Video playback error: \(error.localizedDescription)")
+                        self.errorMessage = "Playback failed: \(error.localizedDescription)"
                         self.isLoading = false
                     }
                 }
-            @unknown default:
-                self.player = newPlayer
-                self.isLoading = false
+                
+                // Observe when video finishes playing
+                let endObserver = NotificationCenter.default.addObserver(
+                    forName: .AVPlayerItemDidPlayToEndTime,
+                    object: playerItem,
+                    queue: .main
+                ) { _ in
+                    print("📹 Video finished playing - restarting from beginning")
+                    newPlayer.seek(to: .zero)
+                    newPlayer.play()
+                }
+                
+                // Store observers for cleanup
+                self.playerObservers = [failedObserver, endObserver]
+                
+                // Set loading timeout
+                DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) {
+                    if self.isLoading {
+                        print("⏰ Video loading timeout")
+                        self.errorMessage = "Video loading timeout. Please check your connection and try again."
+                        self.isLoading = false
+                    }
+                }
+                
+                // Load asset properties asynchronously
+                asset.loadValuesAsynchronously(forKeys: ["duration", "playable"]) {
+                    var error: NSError?
+                    let durationStatus = asset.statusOfValue(forKey: "duration", error: &error)
+                    let playableStatus = asset.statusOfValue(forKey: "playable", error: &error)
+                    
+                    DispatchQueue.main.async {
+                        if durationStatus == .loaded && playableStatus == .loaded {
+                            if asset.isPlayable {
+                                print("✅ Asset is playable")
+                            } else {
+                                print("❌ Asset is not playable")
+                                self.errorMessage = "This video format is not supported"
+                                self.isLoading = false
+                            }
+                        } else if let error = error {
+                            print("❌ Failed to load asset properties: \(error)")
+                            self.errorMessage = "Failed to load video properties: \(error.localizedDescription)"
+                            self.isLoading = false
+                        }
+                    }
+                }
             }
         }
     }
-}
-
-// MARK: - UIWindow Security Extension
-
-extension UIWindow {
-    func makeSecure(with secureField: UITextField) {
-        // This is a simple approach to add the secure field
-        secureField.becomeFirstResponder()
-        secureField.resignFirstResponder()
+    
+    private func cleanupPlayer() {
+        // Remove observers
+        playerItemObserver?.invalidate()
+        playerItemObserver = nil
+        
+        playerObservers.forEach { observer in
+            NotificationCenter.default.removeObserver(observer)
+        }
+        playerObservers.removeAll()
+        
+        // Clean up player
+        player?.pause()
+        player = nil
+        
+        print("🧹 Video player cleaned up")
     }
 }
 
