@@ -9,9 +9,12 @@ interface WebSocketMessage {
   to?: string;
   payload?: any;
   message?: string;
+  content?: string;  // Add content field for iOS app compatibility
+  messageType?: string;  // Add messageType field
+  mediaURL?: string;  // Add mediaURL field
+  fileName?: string;  // Add fileName field (already exists but different purpose)
   timestamp?: number;
   transferId?: string;
-  fileName?: string;
   fileType?: string;
   fileSize?: number;
   fileData?: string;
@@ -25,13 +28,26 @@ function handleChatMessage(message: WebSocketMessage, roomManager: RoomManager, 
     return;
   }
 
-  // Broadcast message to all clients in the room
+  // Handle both 'content' (from iOS app) and 'message' (legacy) fields
+  const messageContent = (message as any).content || message.message;
+  
+  if (!messageContent) {
+    console.error('No message content provided');
+    return;
+  }
+
+  console.log(`📤 Broadcasting message from ${message.clientId} to room ${currentRoomId}: "${messageContent}"`);
+
+  // Broadcast message to all clients in the room except the sender
   roomManager.broadcastToRoom(currentRoomId, {
     type: 'message',
     clientId: message.clientId,
-    message: message.message,
+    content: messageContent,  // Use 'content' for consistency with iOS app
+    messageType: (message as any).messageType || 'text',
+    mediaURL: (message as any).mediaURL || '',
+    fileName: (message as any).fileName || '',
     timestamp: message.timestamp || Date.now()
-  });
+  }, message.clientId);  // Exclude sender
 }
 
 function handleFileMessage(message: WebSocketMessage, roomManager: RoomManager, currentRoomId: string) {

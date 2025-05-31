@@ -171,28 +171,55 @@ struct JoinRoomView: View {
         errorMessage = nil
         isTextFieldFocused = false
         
-        let trimmedRoomId = roomId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedRoomId = roomId.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
         chatService.joinRoom(trimmedRoomId) { result in
             DispatchQueue.main.async {
-                isJoiningRoom = false
-                
                 switch result {
                 case .success(let success):
                     if success {
-                        onRoomJoined(trimmedRoomId)
+                        print("✅ Successfully joined room: \(trimmedRoomId)")
+                        // Wait for connection to be fully established before navigating
+                        self.waitForConnection(roomId: trimmedRoomId)
                     } else {
-                        errorMessage = "Failed to join room. Please check the Room ID."
-                        showError = true
+                        self.isJoiningRoom = false
+                        self.errorMessage = "Failed to join room. Please check the Room ID."
+                        self.showError = true
                     }
                 case .failure(let error):
-                    if error.localizedDescription.contains("Room not found") {
-                        errorMessage = "Room not found. Please check the room ID and try again."
+                    print("❌ Failed to join room: \(error)")
+                    self.isJoiningRoom = false
+                    
+                    if error.localizedDescription.contains("Room not found") || error.localizedDescription.contains("RoomNotFound") {
+                        self.errorMessage = "Room not found. Please check the room ID and try again."
                     } else {
-                        errorMessage = error.localizedDescription
+                        self.errorMessage = error.localizedDescription
                     }
-                    showError = true
+                    self.showError = true
                 }
+            }
+        }
+    }
+    
+    private func waitForConnection(roomId: String) {
+        // Check connection status every 0.5 seconds
+        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            DispatchQueue.main.async {
+                if self.chatService.isConnected && self.chatService.connectionStatus == .connected {
+                    // Connection fully established
+                    timer.invalidate()
+                    self.isJoiningRoom = false
+                    self.onRoomJoined(roomId)
+                    print("✅ Fully connected, navigating to chat room")
+                } else if self.chatService.connectionStatus == .failed {
+                    // Connection failed
+                    timer.invalidate()
+                    self.isJoiningRoom = false
+                    self.errorMessage = "Failed to connect to the room"
+                    self.showError = true
+                    print("❌ Connection failed, stopping wait")
+                }
+                // Continue waiting if still connecting...
             }
         }
     }

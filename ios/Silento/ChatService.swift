@@ -24,34 +24,31 @@ class ChatService: ObservableObject {
     private var urlSession: URLSession
     var currentRoomId: String?
     private var currentServerURL: String?
-    private var clientId: String
+    private var _clientId: String
     private var encryptionKey: SymmetricKey?
+    
+    // Public properties
+    var clientId: String {
+        return self._clientId
+    }
+    
+    var serverURL: String? {
+        return self.currentServerURL
+    }
     
     // Server discovery - Railway production server (much better than Render!)
     private let serverURLs = [
-        "https://silento-back-production.up.railway.app"   // Railway production server
+        "http://localhost:8000",                           // Local test server with fixes
+        "https://silento-back-production.up.railway.app"  // Railway production server
     ]
     
     init() {
-        self.clientId = UUID().uuidString
-        
-        // Create URLSession with custom configuration for better connectivity
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60.0
-        config.timeoutIntervalForResource = 300.0
-        config.waitsForConnectivity = true
-        config.allowsCellularAccess = true
-        config.httpMaximumConnectionsPerHost = 10
-        
-        // Force HTTP/1.1 to avoid QUIC connection issues
-        config.protocolClasses = []
-        
-        self.urlSession = URLSession(configuration: config)
-        
-        // Generate encryption key for this session
+        self._clientId = UUID().uuidString
+        self.urlSession = URLSession.shared
+        self.connectionStatus = .disconnected
         self.encryptionKey = SymmetricKey(size: .bits256)
         
-        print("🆔 Client ID: \(clientId)")
+        print("🆔 Client ID: \(_clientId)")
     }
     
     // MARK: - Server Discovery
@@ -280,7 +277,7 @@ class ChatService: ObservableObject {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 
-                let body = ["clientId": clientId]
+                let body = ["clientId": _clientId]
                 let bodyData = try JSONSerialization.data(withJSONObject: body)
                 request.httpBody = bodyData
                 
@@ -359,7 +356,7 @@ class ChatService: ObservableObject {
         let initMessage = [
             "type": "init",
             "roomId": roomId,
-            "clientId": clientId
+            "clientId": _clientId
         ]
         
         print("📡 Sending WebSocket init message for room: \(roomId)")
@@ -379,37 +376,108 @@ class ChatService: ObservableObject {
     }
     
     func joinRoom(_ roomId: String, completion: @escaping (Result<Bool, Error>) -> Void) {
-        guard let serverURL = currentServerURL else {
-            completion(.failure(NSError(domain: "NoServer", code: 0, userInfo: [NSLocalizedDescriptionKey: "No server available"])))
+        // Prevent multiple simultaneous join attempts
+        guard !isJoiningRoom else {
+            print("🚫 Room joining already in progress")
+            completion(.failure(NSError(domain: "JoinInProgress", code: 0, userInfo: [NSLocalizedDescriptionKey: "Already joining a room"])))
             return
         }
         
-        guard let url = URL(string: "\(serverURL)/api/join-room") else {
-            completion(.failure(NSError(domain: "InvalidURL", code: 0, userInfo: nil)))
-            return
-        }
+        isJoiningRoom = true
+        connectionStatus = .roomJoining
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body = ["roomId": roomId, "clientId": clientId]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    completion(.failure(error))
-                    return
+        Task {
+            await MainActor.run {
+                isJoiningRoom = true
+                connectionStatus = .roomJoining
+            }
+            
+            do {
+                let success = try await performJoinRoom(roomId: roomId)
+                await MainActor.run {
+                    self.isJoiningRoom = false
+                    completion(.success(success))
                 }
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    completion(.success(httpResponse.statusCode == 200))
-                } else {
-                    completion(.failure(NSError(domain: "InvalidResponse", code: 0, userInfo: nil)))
+            } catch {
+                await MainActor.run {
+                    self.isJoiningRoom = false
+                    self.connectionStatus = .failed
+                    completion(.failure(error))
                 }
             }
-        }.resume()
+        }
+    }
+    
+    private func performJoinRoom(roomId: String) async throws -> Bool {
+        for serverURL in serverURLs {
+            print("🔍 Testing server for room join: \(serverURL)")
+            
+            do {
+                // Test server connectivity first
+                guard let healthURL = URL(string: "\(serverURL)/health") else {
+                    throw NetworkError.invalidURL
+                }
+                
+                let (_, response) = try await urlSession.data(from: healthURL)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    continue
+                }
+                
+                print("📡 Server \(serverURL) is healthy for room join")
+                
+                await MainActor.run {
+                    connectionStatus = .connecting
+                }
+                
+                // Join room
+                guard let joinURL = URL(string: "\(serverURL)/api/join-room") else {
+                    throw NetworkError.invalidURL
+                }
+                
+                print("🚪 Joining room \(roomId) at: \(joinURL)")
+                
+                var request = URLRequest(url: joinURL)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                
+                let body = ["roomId": roomId, "clientId": _clientId]
+                let bodyData = try JSONSerialization.data(withJSONObject: body)
+                request.httpBody = bodyData
+                
+                print("📤 Join request body: \(body)")
+                
+                let (data, joinResponse) = try await urlSession.data(for: request)
+                
+                guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
+                    throw NetworkError.invalidResponse
+                }
+                
+                print("📡 Join HTTP Status: \(httpJoinResponse.statusCode)")
+                print("📥 Join Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                guard httpJoinResponse.statusCode == 200 else {
+                    if httpJoinResponse.statusCode == 404 {
+                        throw NSError(domain: "RoomNotFound", code: 404, userInfo: [NSLocalizedDescriptionKey: "Room \(roomId) not found"])
+                    } else {
+                        throw NetworkError.serverError(httpJoinResponse.statusCode)
+                    }
+                }
+                
+                print("✅ Successfully joined room: \(roomId)")
+                
+                // Connect to WebSocket
+                try await connectToWebSocket(serverURL: serverURL, roomId: roomId)
+                
+                return true
+                
+            } catch {
+                print("❌ Server \(serverURL) failed for room join: \(error)")
+                continue
+            }
+        }
+        
+        throw NetworkError.allServersFailed
     }
     
     func connectToRoom(roomId: String) {
@@ -473,7 +541,7 @@ class ChatService: ObservableObject {
         // Send init message
         let initMessage = WebSocketMessage(
             type: "init",
-            clientId: clientId,
+            clientId: _clientId,
             roomId: roomId
         )
         
@@ -523,7 +591,7 @@ class ChatService: ObservableObject {
                        let senderId = json["clientId"] as? String {
                         
                         // Don't add duplicate messages from ourselves
-                        if senderId == self.clientId {
+                        if senderId == self._clientId {
                             print("🔄 Skipping own message echo")
                             return
                         }
@@ -569,7 +637,7 @@ class ChatService: ObservableObject {
                 case "roomState":
                     if let connectedUsers = json["connectedUsers"] as? [String] {
                         print("📊 Room state - connected users: \(connectedUsers)")
-                        self.peers = connectedUsers.filter { $0 != self.clientId }
+                        self.peers = connectedUsers.filter { $0 != self._clientId }
                     }
                     
                 default:
@@ -612,7 +680,7 @@ class ChatService: ObservableObject {
             type: .text,
             isFromCurrentUser: true,
             timestamp: Date(),
-            senderId: clientId,
+            senderId: _clientId,
             status: .sending
         )
         
@@ -637,21 +705,32 @@ class ChatService: ObservableObject {
             return
         }
         
+        guard let roomId = currentRoomId else {
+            print("❌ Cannot send message: no room ID")
+            await MainActor.run {
+                updateMessageStatus(messageId: message.id, status: .failed)
+            }
+            return
+        }
+        
         print("📤 Sending message: '\(message.content)'")
         print("🔗 WebSocket connected: \(isConnected)")
         print("👥 Current peers: \(peers)")
+        print("🏠 Room ID: \(roomId)")
         
         do {
-            // Encrypt message content if encryption is enabled
-            let encryptedContent = try encryptMessage(message.content)
+            // Don't encrypt messages for now to fix cross-user communication
+            // TODO: Implement proper shared encryption key
+            let messageContent = message.content
             
             let webSocketMessage: [String: Any] = [
                 "type": "message",
                 "messageType": message.type.rawValue,
-                "content": encryptedContent,
+                "content": messageContent,
                 "mediaURL": message.mediaURL ?? "",
                 "fileName": message.fileName ?? "",
-                "clientId": clientId
+                "clientId": _clientId,
+                "roomId": roomId  // Add room ID so server knows where to route
             ]
             
             try await sendWebSocketMessage(webSocketMessage)
@@ -761,13 +840,14 @@ class ChatService: ObservableObject {
                 }
                 
                 // Skip messages from ourselves
-                guard senderId != clientId else {
+                guard senderId != _clientId else {
                     print("📤 Skipping own message")
                     return
                 }
                 
-                // Decrypt message content
-                let decryptedContent = (try? decryptMessage(content)) ?? content
+                // Don't decrypt messages for now since encryption is disabled
+                // TODO: Implement proper shared encryption key
+                let messageContent = content
                 
                 let messageType = MessageType(rawValue: messageTypeString) ?? .text
                 let mediaURL = json["mediaURL"] as? String
@@ -775,7 +855,7 @@ class ChatService: ObservableObject {
                 
                 let chatMessage = ChatMessage(
                     id: UUID().uuidString,
-                    content: decryptedContent,
+                    content: messageContent,
                     type: messageType,
                     isFromCurrentUser: false,
                     timestamp: Date(),
@@ -802,7 +882,7 @@ class ChatService: ObservableObject {
                 }
                 
             case "peer-joined":
-                if let peerId = json["clientId"] as? String, peerId != clientId {
+                if let peerId = json["clientId"] as? String, peerId != _clientId {
                     await MainActor.run {
                         if !peers.contains(peerId) {
                             peers.append(peerId)
@@ -903,7 +983,7 @@ class ChatService: ObservableObject {
             type: messageType,
             isFromCurrentUser: true,
             timestamp: Date(),
-            senderId: clientId,
+            senderId: _clientId,
             status: .sending,
             mediaURL: fileURL,
             fileName: fileName
@@ -926,8 +1006,10 @@ class ChatService: ObservableObject {
             } catch NetworkError.serverError(404) {
                 // Server doesn't support uploads yet - provide helpful error message
                 completion(.failure(UploadError.serverNotReady))
+            } catch NetworkError.serverError(_) {
+                completion(.failure(UploadError.invalidResponse))
             } catch {
-                completion(.failure(error))
+                completion(.failure(UploadError.networkError))
             }
         }
     }
@@ -937,7 +1019,7 @@ class ChatService: ObservableObject {
         
         let initMessage = WebSocketMessage(
             type: "init",
-            clientId: clientId,
+            clientId: _clientId,
             roomId: roomId
         )
         
@@ -1065,11 +1147,17 @@ extension ChatService {
     
     enum UploadError: LocalizedError {
         case serverNotReady
+        case networkError
+        case invalidResponse
         
         var errorDescription: String? {
             switch self {
             case .serverNotReady:
-                return "File upload feature is still deploying. Please try again in a few minutes."
+                return "Upload feature is deploying to server. Please try again in a few minutes."
+            case .networkError:
+                return "Network connection issue. Check your internet connection."
+            case .invalidResponse:
+                return "Server error. Please try again later."
             }
         }
     }

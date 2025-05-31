@@ -17,10 +17,14 @@ struct ChatRoomView: View {
     @State private var imagePickerSourceType: UIImagePickerController.SourceType = .photoLibrary
     @State private var selectedImage: UIImage?
     @State private var isRecordingAudio = false
+    @State private var isRecordingVideo = false
     @State private var audioRecorder: AVAudioRecorder?
+    @State private var audioPlayer: AVAudioPlayer?
     @State private var audioSession = AVAudioSession.sharedInstance()
     @State private var recordingTimer: Timer?
     @State private var recordingDuration: TimeInterval = 0
+    @State private var currentlyPlayingAudioURL: String?
+    @State private var audioPlayerDelegate: AudioPlayerDelegate?
     @FocusState private var isMessageFieldFocused: Bool
     
     var body: some View {
@@ -43,7 +47,13 @@ struct ChatRoomView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(chatService.messages) { message in
-                            MessageBubbleView(message: message)
+                            MessageBubbleView(
+                                message: message,
+                                onAudioPlay: { audioURL in
+                                    playAudio(url: audioURL)
+                                },
+                                currentlyPlayingURL: currentlyPlayingAudioURL
+                            )
                                 .id(message.id)
                         }
                     }
@@ -75,12 +85,15 @@ struct ChatRoomView: View {
                 messageText: $messageText,
                 isMessageFieldFocused: $isMessageFieldFocused,
                 onSend: sendMessage,
-                onAttachmentTap: {
-                    showMediaOptions = true
-                },
+                onAttachmentTap: showAttachmentOptions,
                 onCameraTap: {
+                    // Direct camera access
                     imagePickerSourceType = .camera
                     showImagePicker = true
+                },
+                onCameraLongPress: {
+                    // Long press for video recording
+                    startVideoRecording()
                 },
                 onVoiceTap: toggleAudioRecording,
                 isRecording: isRecordingAudio
@@ -95,22 +108,20 @@ struct ChatRoomView: View {
                 connectionStatus: chatService.connectionStatus
             )
         }
-        .confirmationDialog("Choose Media", isPresented: $showMediaOptions, titleVisibility: .visible) {
-            Button("Photo Library") {
-                imagePickerSourceType = .photoLibrary
-                showImagePicker = true
-            }
-            
-            Button("Camera") {
-                imagePickerSourceType = .camera
-                showImagePicker = true
-            }
-            
-            Button("Document") {
-                showDocumentPicker = true
-            }
-            
-            Button("Cancel", role: .cancel) { }
+        .actionSheet(isPresented: $showMediaOptions) {
+            ActionSheet(
+                title: Text("Attach Media"),
+                buttons: [
+                    .default(Text("Photo Library")) {
+                        imagePickerSourceType = .photoLibrary
+                        showImagePicker = true
+                    },
+                    .default(Text("Document")) {
+                        showDocumentPicker = true
+                    },
+                    .cancel()
+                ]
+            )
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePickerView(
@@ -342,6 +353,72 @@ struct ChatRoomView: View {
             chatService.sendMessage("❌ Failed to read document: \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Video Recording
+    
+    private func startVideoRecording() {
+        print("🎥 Starting video recording...")
+        // For now, just open camera with video mode
+        // In a full implementation, you'd want to use AVCaptureSession for custom video recording
+        imagePickerSourceType = .camera
+        showImagePicker = true
+        isRecordingVideo = false
+    }
+    
+    // MARK: - Audio Playback
+    
+    private func playAudio(url: String) {
+        // Stop current audio if playing
+        audioPlayer?.stop()
+        
+        guard let audioURL = URL(string: url) else {
+            print("❌ Invalid audio URL: \(url)")
+            return
+        }
+        
+        print("🎵 Playing audio: \(url)")
+        currentlyPlayingAudioURL = url
+        
+        // Download and play audio
+        URLSession.shared.dataTask(with: audioURL) { data, response, error in
+            guard let data = data, error == nil else {
+                print("❌ Failed to download audio: \(error?.localizedDescription ?? "Unknown error")")
+                DispatchQueue.main.async {
+                    self.currentlyPlayingAudioURL = nil
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                do {
+                    // Configure audio session for playback
+                    try self.audioSession.setCategory(.playback, mode: .default)
+                    try self.audioSession.setActive(true)
+                    
+                    self.audioPlayer = try AVAudioPlayer(data: data)
+                    
+                    // Create and store delegate with strong reference
+                    self.audioPlayerDelegate = AudioPlayerDelegate {
+                        DispatchQueue.main.async {
+                            self.currentlyPlayingAudioURL = nil
+                        }
+                    }
+                    self.audioPlayer?.delegate = self.audioPlayerDelegate
+                    
+                    self.audioPlayer?.play()
+                    print("✅ Audio playback started")
+                    
+                } catch {
+                    print("❌ Failed to play audio: \(error)")
+                    self.currentlyPlayingAudioURL = nil
+                }
+            }
+        }.resume()
+    }
+    
+    private func showAttachmentOptions() {
+        showMediaOptions = true
+    }
 }
 
 struct ChatHeaderView: View {
@@ -420,6 +497,8 @@ struct ChatHeaderView: View {
 
 struct MessageBubbleView: View {
     let message: ChatMessage
+    let onAudioPlay: (String) -> Void
+    let currentlyPlayingURL: String?
     
     var body: some View {
         HStack {
@@ -558,26 +637,54 @@ struct MessageBubbleView: View {
             case .audio:
                 HStack(spacing: 12) {
                     Button(action: {
-                        // TODO: Play audio
+                        if let mediaURL = message.mediaURL {
+                            onAudioPlay(mediaURL)
+                        }
                     }) {
-                        Image(systemName: "play.circle.fill")
+                        Image(systemName: currentlyPlayingURL == message.mediaURL ? "pause.circle.fill" : "play.circle.fill")
                             .font(.title2)
                             .foregroundColor(.white)
                     }
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        if !message.content.isEmpty {
-                            Text(message.content)
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !message.content.isEmpty && !message.content.contains("Uploading") {
+                            Text(message.fileName ?? "Voice Message")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                        } else {
+                            Text("Voice Message")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         
-                        // Audio waveform placeholder
-                        HStack(spacing: 2) {
-                            ForEach(0..<20, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.white.opacity(0.6))
-                                    .frame(width: 3, height: CGFloat.random(in: 8...24))
+                        // Show audio duration or upload status
+                        if message.content.contains("Uploading") {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.6)
+                                Text("Uploading...")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        } else if message.content.contains("Failed") {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle")
+                                    .font(.caption2)
+                                    .foregroundColor(.red)
+                                Text("Upload failed")
+                                    .font(.caption2)
+                                    .foregroundColor(.red)
+                            }
+                        } else {
+                            // Audio waveform visualization
+                            HStack(spacing: 2) {
+                                ForEach(0..<12, id: \.self) { index in
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(currentlyPlayingURL == message.mediaURL ? Color.blue : Color.white.opacity(0.6))
+                                        .frame(width: 2, height: CGFloat.random(in: 6...16))
+                                        .animation(.easeInOut(duration: 0.5).delay(Double(index) * 0.1), value: currentlyPlayingURL)
+                                }
                             }
                         }
                     }
@@ -670,6 +777,7 @@ struct ModernMessageInputView: View {
     let onSend: () -> Void
     let onAttachmentTap: () -> Void
     let onCameraTap: () -> Void
+    let onCameraLongPress: () -> Void
     let onVoiceTap: () -> Void
     let isRecording: Bool
     
@@ -706,12 +814,22 @@ struct ModernMessageInputView: View {
                         }
                     }
                 
-                // Camera button (when no text)
+                // Camera button with long press for video
                 if !hasText {
-                    Button(action: onCameraTap) {
+                    Button(action: {
+                        // Short tap - take photo with camera
+                        onCameraTap()
+                    }) {
                         Image(systemName: "camera.fill")
                             .font(.title3)
                             .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .onLongPressGesture(minimumDuration: 0.5) {
+                        // Long press - record video
+                        onCameraLongPress()
                     }
                 }
             }
@@ -897,6 +1015,24 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             parent.isPresented = false
         }
+    }
+}
+
+// MARK: - Audio Player Delegate
+
+class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
+    private let onFinish: () -> Void
+    
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+    
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onFinish()
+    }
+    
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        onFinish()
     }
 }
 
