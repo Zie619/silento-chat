@@ -165,6 +165,21 @@ function App() {
 
   return (
     <div className="app">
+      <div style={{ position: 'fixed', top: 10, right: 10, zIndex: 1000, background: 'red', padding: '10px', borderRadius: '5px' }}>
+        <div style={{ color: 'white', marginBottom: '5px' }}>Screen: {currentScreen}</div>
+        <button 
+          style={{ background: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', marginRight: '5px' }}
+          onClick={() => setCurrentScreen('createRoom')}
+        >
+          Test Create
+        </button>
+        <button 
+          style={{ background: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px' }}
+          onClick={() => setCurrentScreen('joinRoom')}
+        >
+          Test Join
+        </button>
+      </div>
       {renderContent()}
     </div>
   );
