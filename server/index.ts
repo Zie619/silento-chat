@@ -1,36 +1,30 @@
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import { setupRoutes } from './routes.js';
 
 const app = express();
 const server = http.createServer(app);
 
-// Get directory paths for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Environment configuration
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const PORT = parseInt(process.env.PORT || '5001', 10);
 
-// CORS configuration for production
+// CORS configuration - Allow iOS app and web browsers
 const corsOptions = {
   origin: isDevelopment 
     ? ['http://localhost:3000', 'http://127.0.0.1:3000']
     : [
         'https://silento-backend.onrender.com',
-        'https://render.com',
-        'https://railway.app',
-        'https://vercel.app',
-        'https://netlify.app'
+        'https://localhost:3000',
+        'capacitor://localhost',
+        'ionic://localhost',
+        'http://localhost',
+        'https://localhost'
       ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 // Middleware
@@ -38,43 +32,29 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Serve static files from React build (production only)
-if (!isDevelopment) {
-  // Try multiple possible paths for the React build
-  const possiblePaths = [
-    path.resolve(process.cwd(), 'dist'),
-    path.resolve(__dirname, '..', '..', 'dist'),
-    path.resolve(__dirname, '..', 'dist'),
-    path.resolve('/opt/render/project/src/dist')
-  ];
-  
-  let buildPath = possiblePaths[0]; // default
-  
-  // Find the correct path that exists
-  for (const testPath of possiblePaths) {
-    try {
-      if (fs.existsSync(testPath) && fs.existsSync(path.join(testPath, 'index.html'))) {
-        buildPath = testPath;
-        break;
-      }
-    } catch (e) {
-      // ignore errors, continue checking
-    }
-  }
-  
-  console.log(`Serving static files from: ${buildPath}`);
-  console.log(`Current working directory: ${process.cwd()}`);
-  console.log(`Server __dirname: ${__dirname}`);
-  console.log(`Checking if index.html exists: ${fs.existsSync(path.join(buildPath, 'index.html'))}`);
-  
-  app.use(express.static(buildPath));
-}
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    message: 'Silento API Server - iOS Compatible'
+  });
+});
+
+// API info endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    name: 'Silento API Server',
+    version: '1.0.0',
+    description: 'Anonymous chat API for iOS and web clients',
+    endpoints: {
+      health: '/health',
+      createRoom: 'POST /api/create-room',
+      joinRoom: 'POST /api/join-room',
+      roomStatus: 'GET /api/room/:roomId/status',
+      websocket: '/ws'
+    },
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -105,22 +85,28 @@ app.use((req: any, res: any, next: any) => {
 // Setup API routes and WebSocket
 setupRoutes(app, server);
 
-// Serve React app for all non-API routes (production only)
-if (!isDevelopment) {
-  app.get('*', (req, res) => {
-    const indexPath = path.resolve(process.cwd(), 'dist', 'index.html');
-    console.log(`Serving React app from: ${indexPath}`);
-    res.sendFile(indexPath);
+// Handle 404 for unknown API routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'API endpoint not found',
+    message: 'This is an API-only server for the Silento chat app',
+    availableEndpoints: {
+      health: 'GET /health',
+      apiInfo: 'GET /',
+      createRoom: 'POST /api/create-room',
+      joinRoom: 'POST /api/join-room',
+      roomStatus: 'GET /api/room/:roomId/status',
+      websocket: 'WebSocket /ws'
+    }
   });
-}
+});
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Silento API Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  if (!isDevelopment) {
-    console.log(`Frontend served from: ${path.resolve(process.cwd(), 'dist')}`);
-  }
+  console.log(`API Info: http://localhost:${PORT}/`);
+  console.log(`🎯 API-only mode - No frontend serving`);
 });
 
 // Cleanup interval for rate limiting
