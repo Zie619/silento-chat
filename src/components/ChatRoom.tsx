@@ -139,7 +139,10 @@ function ChatRoom({ roomId, clientId, onLeave }: ChatRoomProps) {
 
       <div className="chat-container">
         <MessageList messages={messages || []} currentUserId={clientId} />
-        <MessageInput onSendMessage={handleSendMessage} />
+        <MessageInput 
+          onSendMessage={handleSendMessage} 
+          onSendMedia={handleSendMedia}
+        />
       </div>
     </div>
   );

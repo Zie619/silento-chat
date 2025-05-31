@@ -62,13 +62,24 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
 
     // Create preview URL
     const previewUrl = URL.createObjectURL(file);
-    const fileType = file.type.startsWith('image/') ? 'image' : 
-                     file.type.startsWith('video/') ? 'video' : 'audio';
+    
+    // Better file type detection
+    let fileType: 'image' | 'video' | 'audio';
+    if (file.type.startsWith('image/')) {
+      fileType = 'image';
+    } else if (file.type.startsWith('video/')) {
+      fileType = 'video';
+    } else if (file.type.startsWith('audio/')) {
+      fileType = 'audio';
+    } else {
+      // For non-media files, treat as generic file
+      fileType = 'image'; // We'll show a file icon instead
+    }
     
     setCapturedMedia({
       file,
       preview: previewUrl,
-      type: fileType as 'image' | 'video' | 'audio'
+      type: fileType
     });
     
     // Reset file input
@@ -76,29 +87,65 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
   };
 
   const startCamera = async (mode: 'photo' | 'video') => {
+    console.log('Starting camera in mode:', mode);
     try {
-      const constraints = {
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('getUserMedia not supported');
+        alert('Camera access is not supported in this browser.');
+        return;
+      }
+
+      const constraints: MediaStreamConstraints = {
         video: { 
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 }
         },
         audio: mode === 'video' ? true : false
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Requesting media with constraints:', constraints);
+
+      // Try with ideal constraints first
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Got media stream with ideal constraints');
+      } catch (error) {
+        // Fallback to basic constraints if ideal ones fail
+        console.warn('Ideal constraints failed, trying basic:', error);
+        const basicConstraints: MediaStreamConstraints = {
+          video: true,
+          audio: mode === 'video' ? true : false
+        };
+        stream = await navigator.mediaDevices.getUserMedia(basicConstraints);
+        console.log('Got media stream with basic constraints');
+      }
+
       setMediaStream(stream);
       setCameraMode(mode);
       setShowCamera(true);
+      console.log('Camera interface should be visible now');
       
-      // Set up video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
+      // Set up video element with a delay to ensure proper initialization
+      setTimeout(() => {
+        if (videoRef.current && stream) {
+          console.log('Setting up video element');
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().then(() => {
+            console.log('Video is playing');
+          }).catch(err => {
+            console.error('Video play failed:', err);
+          });
+        } else {
+          console.error('Video ref or stream not available');
+        }
+      }, 100);
+      
     } catch (error) {
       console.error('Camera access failed:', error);
-      alert('Failed to access camera. Please check your permissions.');
+      alert(`Failed to access camera: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -153,9 +200,20 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
     if (!mediaStream) return;
 
     const chunks: Blob[] = [];
-    const recorder = new MediaRecorder(mediaStream, {
-      mimeType: 'video/webm'
-    });
+    
+    // Try different MIME types for better compatibility
+    let mimeType = 'video/webm';
+    if (!MediaRecorder.isTypeSupported('video/webm')) {
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/mp4';
+      } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+        mimeType = 'video/webm;codecs=vp8';
+      } else {
+        mimeType = ''; // Let browser choose
+      }
+    }
+
+    const recorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
     
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -164,9 +222,11 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
     };
     
     recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      const actualMimeType = recorder.mimeType || 'video/webm';
+      const blob = new Blob(chunks, { type: actualMimeType });
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const file = new File([blob], `video-${timestamp}.webm`, { type: 'video/webm' });
+      const extension = actualMimeType.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File([blob], `video-${timestamp}.${extension}`, { type: actualMimeType });
       const previewUrl = URL.createObjectURL(blob);
       
       setCapturedMedia({
@@ -175,6 +235,12 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         type: 'video'
       });
       
+      stopCamera();
+    };
+    
+    recorder.onerror = (event) => {
+      console.error('Recording error:', event);
+      alert('Recording failed. Please try again.');
       stopCamera();
     };
     
@@ -215,12 +281,33 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         return;
       }
 
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Microphone access is not supported in this browser.');
+        return;
+      }
+
       // Start recording
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setMediaStream(stream);
       
       const chunks: Blob[] = [];
-      const recorder = new MediaRecorder(stream);
+      
+      // Try different MIME types for better compatibility
+      let mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        } else {
+          mimeType = ''; // Let browser choose
+        }
+      }
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -229,9 +316,12 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
       };
       
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const actualMimeType = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunks, { type: actualMimeType });
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const file = new File([blob], `voice-${timestamp}.webm`, { type: 'audio/webm' });
+        const extension = actualMimeType.includes('mp4') ? 'm4a' : 
+                         actualMimeType.includes('ogg') ? 'ogg' : 'webm';
+        const file = new File([blob], `voice-${timestamp}.${extension}`, { type: actualMimeType });
         const previewUrl = URL.createObjectURL(blob);
         
         setCapturedMedia({
@@ -241,6 +331,20 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
         });
         
         // Clean up
+        stream.getTracks().forEach(track => track.stop());
+        setMediaStream(null);
+        setIsRecording(false);
+        setRecordingTime(0);
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+        }
+      };
+
+      recorder.onerror = (event) => {
+        console.error('Audio recording error:', event);
+        alert('Audio recording failed. Please try again.');
+        
+        // Clean up on error
         stream.getTracks().forEach(track => track.stop());
         setMediaStream(null);
         setIsRecording(false);
@@ -269,17 +373,22 @@ function MessageInput({ onSendMessage, onSendMedia, disabled = false }: MessageI
       
     } catch (error) {
       console.error('Voice recording failed:', error);
-      alert('Failed to access microphone. Please check your permissions.');
+      alert(`Failed to access microphone: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleSendMedia = () => {
+    console.log('handleSendMedia called', capturedMedia);
     if (capturedMedia && onSendMedia) {
+      console.log('Sending media:', capturedMedia.file.name, capturedMedia.type);
       onSendMedia(capturedMedia.file, capturedMedia.type);
       
       // Clean up
       URL.revokeObjectURL(capturedMedia.preview);
       setCapturedMedia(null);
+      console.log('Media sent and cleaned up');
+    } else {
+      console.error('Cannot send media - missing data or callback', { capturedMedia, onSendMedia });
     }
   };
 
