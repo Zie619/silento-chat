@@ -3,7 +3,7 @@ import CreateRoom from './components/CreateRoom';
 import JoinRoom from './components/JoinRoom';
 import ChatRoom from './components/ChatRoom';
 
-type AppState = 'loading' | 'home' | 'create' | 'join' | 'chat';
+type AppState = 'loading' | 'home' | 'createRoom' | 'joinRoom' | 'chat';
 
 interface RoomInfo {
   roomId: string;
@@ -26,7 +26,7 @@ const ParticleBackground = () => {
 };
 
 function App() {
-  const [state, setState] = useState<AppState>('loading');
+  const [currentScreen, setCurrentScreen] = useState<AppState>('loading');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ function App() {
       
       // Simulate loading with minimum time for smooth experience
       await new Promise(resolve => setTimeout(resolve, 1800));
-      setState('home');
+      setCurrentScreen('home');
     };
 
     initializeApp();
@@ -49,22 +49,22 @@ function App() {
   const handleRoomCreated = (roomId: string) => {
     const clientId = sessionStorage.getItem('clientId') || `client_${Date.now()}`;
     setRoomInfo({ roomId, clientId });
-    setState('chat');
+    setCurrentScreen('chat');
   };
 
   const handleRoomJoined = (roomId: string) => {
     const clientId = sessionStorage.getItem('clientId') || `client_${Date.now()}`;
     setRoomInfo({ roomId, clientId });
-    setState('chat');
+    setCurrentScreen('chat');
   };
 
   const handleLeaveRoom = () => {
     setRoomInfo(null);
-    setState('home');
+    setCurrentScreen('home');
   };
 
   const renderContent = () => {
-    switch (state) {
+    switch (currentScreen) {
       case 'loading':
         return (
           <div className="splash-screen">
@@ -81,11 +81,11 @@ function App() {
           </div>
         );
       
-      case 'create':
-        return <CreateRoom onRoomCreated={handleRoomCreated} onBack={() => setState('home')} />;
+      case 'createRoom':
+        return <CreateRoom onRoomCreated={handleRoomCreated} onBack={() => setCurrentScreen('home')} />;
       
-      case 'join':
-        return <JoinRoom onRoomJoined={handleRoomJoined} onBack={() => setState('home')} />;
+      case 'joinRoom':
+        return <JoinRoom onRoomJoined={handleRoomJoined} onBack={() => setCurrentScreen('home')} />;
       
       case 'chat':
         return roomInfo ? (
@@ -99,75 +99,56 @@ function App() {
       default:
         return (
           <div className="home-screen">
-            <ParticleBackground />
             <div className="home-container">
               <div className="hero-section">
-                <div className="logo">Silento</div>
-                <div className="tagline">Anonymous messaging that disappears</div>
+                <div className="logo-wrapper">
+                  <div className="logo">Silento</div>
+                  <div className="logo-subtitle">Secure Messaging</div>
+                </div>
+                <p className="tagline">Anonymous. Encrypted. Private.</p>
                 <div className="feature-pills">
-                  <span className="pill">🔒 End-to-End Encrypted</span>
-                  <span className="pill">👻 No Registration</span>
-                  <span className="pill">💨 Auto-Delete</span>
+                  <span className="pill">End-to-End Encrypted</span>
+                  <span className="pill">No Account Required</span>
+                  <span className="pill">WebRTC Powered</span>
                 </div>
               </div>
-              
+
               <div className="home-actions">
-                <button 
-                  className="action-btn primary"
-                  onClick={() => setState('create')}
-                >
+                <button className="action-btn primary" onClick={() => setCurrentScreen('createRoom')}>
                   <div className="btn-content">
-                    <div className="btn-icon">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 8v8m-4-4h8"/>
-                      </svg>
-                    </div>
+                    <div className="btn-icon">🔐</div>
                     <div className="btn-text">
-                      <div className="action-btn-title">Create Room</div>
-                      <div className="action-btn-subtitle">Start a new secure conversation</div>
+                      <span className="action-btn-title">Create Private Room</span>
+                      <span className="action-btn-subtitle">Start a secure conversation</span>
                     </div>
                   </div>
                 </button>
-                
-                <button 
-                  className="action-btn"
-                  onClick={() => setState('join')}
-                >
+
+                <button className="action-btn" onClick={() => setCurrentScreen('joinRoom')}>
                   <div className="btn-content">
-                    <div className="btn-icon">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-                        <polyline points="10 17 15 12 10 7"/>
-                        <line x1="15" y1="12" x2="3" y2="12"/>
-                      </svg>
-                    </div>
+                    <div className="btn-icon">🔗</div>
                     <div className="btn-text">
-                      <div className="action-btn-title">Join Room</div>
-                      <div className="action-btn-subtitle">Enter an existing conversation</div>
+                      <span className="action-btn-title">Join Existing Room</span>
+                      <span className="action-btn-subtitle">Enter room code to connect</span>
                     </div>
                   </div>
                 </button>
               </div>
-              
+
               <div className="security-info">
                 <div className="security-item">
-                  <span className="icon">🔒</span>
+                  <span className="icon">🛡️</span>
                   <span className="label">Encrypted</span>
                 </div>
                 <div className="security-item">
-                  <span className="icon">⏱️</span>
-                  <span className="label">Temporary</span>
-                </div>
-                <div className="security-item">
-                  <span className="icon">🙈</span>
+                  <span className="icon">👤</span>
                   <span className="label">Anonymous</span>
                 </div>
+                <div className="security-item">
+                  <span className="icon">🔒</span>
+                  <span className="label">Secure</span>
+                </div>
               </div>
-            </div>
-            
-            <div className="premium-badge">
-              v2.0 Premium
             </div>
           </div>
         );
