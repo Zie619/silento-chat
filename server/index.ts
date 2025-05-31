@@ -96,6 +96,8 @@ app.use('*', (req, res) => {
       createRoom: 'POST /api/create-room',
       joinRoom: 'POST /api/join-room',
       roomStatus: 'GET /api/room/:roomId/status',
+      uploadFile: 'POST /api/upload',
+      downloadFile: 'GET /api/file/:fileId',
       websocket: 'WebSocket /ws'
     }
   });
