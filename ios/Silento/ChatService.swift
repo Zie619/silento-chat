@@ -38,8 +38,8 @@ class ChatService: ObservableObject {
     
     // Server discovery - Railway production server (much better than Render!)
     private let serverURLs = [
-        "http://localhost:8000",                           // Local test server with fixes
-        "https://silento-back-production.up.railway.app"  // Railway production server
+        "https://silento-back-production.up.railway.app",  // Railway production server  
+        "http://localhost:8000"                           // Local test server with fixes
     ]
     
     init() {
@@ -481,15 +481,24 @@ class ChatService: ObservableObject {
     }
     
     func connectToRoom(roomId: String) {
-        // This method is now redundant since we use the async createRoom flow
-        // Just delegate to the createRoom if needed for compatibility
-        createRoom { result in
-            switch result {
-            case .success(let createdRoomId):
-                print("✅ Connected to room: \(createdRoomId)")
-            case .failure(let error):
-                print("❌ Failed to connect to room: \(error)")
-            }
+        // This method should just ensure we're properly connected to the existing room
+        // Don't create a new room - we're already in one!
+        print("🔗 Ensuring connection to existing room: \(roomId)")
+        
+        // If we already have a current room and it matches, do nothing
+        if let currentRoom = currentRoomId, currentRoom == roomId, isConnected {
+            print("✅ Already connected to room: \(roomId)")
+            return
+        }
+        
+        // Update current room ID if different
+        currentRoomId = roomId
+        
+        // If not connected yet, the existing joinRoom or createRoom flow will handle the connection
+        if !isConnected {
+            print("⏳ Connection will be established by join/create room flow")
+        } else {
+            print("✅ Connected to room: \(roomId)")
         }
     }
     
