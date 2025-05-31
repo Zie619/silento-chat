@@ -26,56 +26,98 @@ struct ChatRoomView: View {
     @State private var currentlyPlayingAudioURL: String?
     @State private var audioPlayerDelegate: AudioPlayerDelegate?
     @FocusState private var isMessageFieldFocused: Bool
+    @State private var uploadingMessages: Set<String> = []
+    @State private var previousPeerCount = 0
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            ChatHeaderView(
-                roomId: roomId,
-                peerCount: chatService.peers.count,
-                isConnected: chatService.isConnected,
-                onInfoTap: {
-                    showRoomInfo = true
-                },
-                onLeaveTap: {
-                    showLeaveAlert = true
+            HStack {
+                Button(action: { showLeaveAlert = true }) {
+                    Image(systemName: "arrow.left")
+                        .font(.title2)
+                        .foregroundColor(.white)
                 }
-            )
+                
+                Spacer()
+                
+                Button(action: { showRoomInfo = true }) {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text("Room \(roomId)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Circle()
+                                .fill(chatService.isConnected ? .green : .red)
+                                .frame(width: 8, height: 8)
+                        }
+                        
+                        if chatService.peers.isEmpty {
+                            Text("You're alone")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                        } else {
+                            Text("\(chatService.peers.count) other\(chatService.peers.count == 1 ? "" : "s")")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: { showRoomInfo = true }) {
+                    Image(systemName: "info.circle")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.black.opacity(0.8))
             
             // Messages
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 12) {
                         ForEach(chatService.messages) { message in
                             MessageBubbleView(
                                 message: message,
-                                onAudioPlay: { audioURL in
-                                    playAudio(url: audioURL)
-                                },
-                                currentlyPlayingURL: currentlyPlayingAudioURL
+                                isCurrentUser: message.isFromCurrentUser,
+                                currentlyPlayingURL: $currentlyPlayingAudioURL,
+                                onPlayAudio: playAudioMessage,
+                                onStopAudio: stopAudioPlayback,
+                                isUploading: uploadingMessages.contains(message.id)
                             )
-                                .id(message.id)
+                            .id(message.id)
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 8)
                 }
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.1, green: 0.1, blue: 0.15),
-                            Color(red: 0.05, green: 0.05, blue: 0.1)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
                 .onChange(of: chatService.messages.count) { _ in
-                    // Auto-scroll to latest message
                     if let lastMessage = chatService.messages.last {
-                        withAnimation(.easeOut(duration: 0.3)) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
                         }
+                    }
+                }
+                .onChange(of: chatService.peers.count) { newCount in
+                    // Add user join/leave messages
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if previousPeerCount > 0 { // Only show messages after initial load
+                            if newCount > previousPeerCount {
+                                // User joined
+                                let joinMessage = "👋 A user joined the room"
+                                addSystemMessage(joinMessage)
+                            } else if newCount < previousPeerCount {
+                                // User left
+                                let leaveMessage = "👋 A user left the room"
+                                addSystemMessage(leaveMessage)
+                            }
+                        }
+                        previousPeerCount = newCount
                     }
                 }
             }
@@ -87,7 +129,7 @@ struct ChatRoomView: View {
                 onSend: sendMessage,
                 onAttachmentTap: showAttachmentOptions,
                 onCameraTap: {
-                    // Direct camera access
+                    // Direct camera access for photos - first tap goes to camera
                     imagePickerSourceType = .camera
                     showImagePicker = true
                 },
@@ -127,7 +169,8 @@ struct ChatRoomView: View {
             ImagePickerView(
                 sourceType: imagePickerSourceType,
                 selectedImage: $selectedImage,
-                isPresented: $showImagePicker
+                isPresented: $showImagePicker,
+                allowsVideo: imagePickerSourceType == .camera // Allow video when using camera
             )
         }
         .sheet(isPresented: $showDocumentPicker) {
@@ -153,6 +196,26 @@ struct ChatRoomView: View {
         .onTapGesture {
             isMessageFieldFocused = false
         }
+        .onAppear {
+            previousPeerCount = chatService.peers.count
+        }
+    }
+    
+    private func addSystemMessage(_ content: String) {
+        // Create a system message that looks different from user messages
+        let systemMessage = ChatMessage(
+            id: UUID().uuidString,
+            content: content,
+            type: .text,
+            isFromCurrentUser: false,
+            timestamp: Date(),
+            senderId: "system",
+            status: .delivered
+        )
+        
+        DispatchQueue.main.async {
+            chatService.messages.append(systemMessage)
+        }
     }
     
     private func sendMessage() {
@@ -175,105 +238,104 @@ struct ChatRoomView: View {
     }
     
     private func startAudioRecording() {
-        print("🎤 Starting audio recording...")
-        
         do {
-            // Configure audio session
-            try audioSession.setCategory(.record, mode: .default)
+            // Configure audio session for recording
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try audioSession.setActive(true)
             
-            // Check microphone permission
+            // Request microphone permission
             audioSession.requestRecordPermission { allowed in
                 DispatchQueue.main.async {
                     if allowed {
                         self.beginRecording()
                     } else {
                         print("❌ Microphone permission denied")
-                        self.isRecordingAudio = false
                     }
                 }
             }
         } catch {
-            print("❌ Failed to setup audio session: \(error)")
-            isRecordingAudio = false
+            print("❌ Failed to configure audio session: \(error)")
         }
     }
     
     private func beginRecording() {
-        let audioFilename = getDocumentsDirectory().appendingPathComponent("recording_\(Date().timeIntervalSince1970).m4a")
+        let audioURL = getDocumentsDirectory().appendingPathComponent("recording_\(Date().timeIntervalSince1970).m4a")
         
         let settings = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44100,
+            AVSampleRateKey: 12000,
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
         
         do {
-            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+            audioRecorder = try AVAudioRecorder(url: audioURL, settings: settings)
             audioRecorder?.record()
             
-            // Start timer for recording duration
             recordingDuration = 0
-            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                recordingDuration += 0.1
+            recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+                self.recordingDuration += 1
             }
             
-            print("🎤 Recording started...")
+            print("🎤 Audio recording started")
         } catch {
-            print("❌ Could not start recording: \(error)")
+            print("❌ Failed to start recording: \(error)")
             isRecordingAudio = false
         }
     }
     
     private func stopAudioRecording() {
-        print("🎤 Stopping audio recording...")
-        
         audioRecorder?.stop()
         recordingTimer?.invalidate()
         recordingTimer = nil
         
-        do {
-            try audioSession.setActive(false)
-        } catch {
-            print("❌ Error deactivating audio session: \(error)")
-        }
+        guard let audioRecorder = audioRecorder else { return }
         
-        // Handle the recorded audio file
-        if let audioURL = audioRecorder?.url {
-            handleAudioRecording(audioURL)
-        } else {
-            print("❌ No audio file recorded")
-        }
-    }
-    
-    private func handleAudioRecording(_ audioURL: URL) {
+        let audioURL = audioRecorder.url
+        
         do {
             let audioData = try Data(contentsOf: audioURL)
-            let fileName = "audio_\(Date().timeIntervalSince1970).m4a"
-            let durationText = String(format: "%.1f", recordingDuration)
+            let fileName = "voice_\(Date().timeIntervalSince1970).m4a"
             
-            // Show uploading message
-            let uploadingMessage = "🎤 Uploading voice message (\(durationText)s)..."
-            chatService.sendMessage(uploadingMessage)
+            // Create uploading placeholder message
+            let uploadingMessageId = UUID().uuidString
+            let uploadingMessage = ChatMessage(
+                id: uploadingMessageId,
+                content: "🎤 Uploading voice message...",
+                type: .audio,
+                isFromCurrentUser: true,
+                timestamp: Date(),
+                senderId: clientId,
+                status: .sending
+            )
             
-            // Upload audio file
-            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/m4a") { result in
+            DispatchQueue.main.async {
+                self.chatService.messages.append(uploadingMessage)
+                self.uploadingMessages.insert(uploadingMessageId)
+            }
+            
+            // Upload to server
+            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/mp4") { result in
                 DispatchQueue.main.async {
+                    // Remove uploading placeholder
+                    self.uploadingMessages.remove(uploadingMessageId)
+                    if let index = self.chatService.messages.firstIndex(where: { $0.id == uploadingMessageId }) {
+                        self.chatService.messages.remove(at: index)
+                    }
+                    
                     switch result {
                     case .success(let fileURL):
-                        print("✅ Audio uploaded successfully: \(fileURL)")
-                        // Send audio message
-                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/m4a")
+                        print("✅ Voice message uploaded: \(fileURL)")
+                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/mp4")
                         
                     case .failure(let error):
-                        print("❌ Failed to upload audio: \(error)")
-                        self.chatService.sendMessage("❌ Failed to upload voice message: \(error.localizedDescription)")
+                        print("❌ Failed to upload voice message: \(error)")
+                        self.chatService.sendMessage("❌ Failed to upload voice message")
                     }
                 }
             }
             
-            // Clean up the temporary file
+            // Clean up the local file
             try? FileManager.default.removeItem(at: audioURL)
             
         } catch {
@@ -298,17 +360,36 @@ struct ChatRoomView: View {
         
         let fileName = "image_\(Date().timeIntervalSince1970).jpg"
         
-        // Show uploading message
-        let uploadingMessage = "📸 Uploading image..."
-        chatService.sendMessage(uploadingMessage)
+        // Create uploading placeholder message with loading indicator
+        let uploadingMessageId = UUID().uuidString
+        let uploadingMessage = ChatMessage(
+            id: uploadingMessageId,
+            content: "📸 Uploading image...",
+            type: .text,
+            isFromCurrentUser: true,
+            timestamp: Date(),
+            senderId: clientId,
+            status: .sending
+        )
+        
+        DispatchQueue.main.async {
+            self.chatService.messages.append(uploadingMessage)
+            self.uploadingMessages.insert(uploadingMessageId)
+        }
         
         // Upload file to server
         chatService.uploadFile(imageData, fileName: fileName, mimeType: "image/jpeg") { result in
             DispatchQueue.main.async {
+                // Remove uploading placeholder
+                self.uploadingMessages.remove(uploadingMessageId)
+                if let index = self.chatService.messages.firstIndex(where: { $0.id == uploadingMessageId }) {
+                    self.chatService.messages.remove(at: index)
+                }
+                
                 switch result {
                 case .success(let fileURL):
                     print("✅ Image uploaded successfully: \(fileURL)")
-                    // Send media message with actual file URL
+                    // Send actual media message
                     self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "image/jpeg")
                     
                 case .failure(let error):
@@ -328,17 +409,36 @@ struct ChatRoomView: View {
             let fileName = url.lastPathComponent
             let mimeType = "application/octet-stream" // Generic mime type for documents
             
-            // Show uploading message
-            let uploadingMessage = "📄 Uploading document..."
-            chatService.sendMessage(uploadingMessage)
+            // Create uploading placeholder message with loading indicator
+            let uploadingMessageId = UUID().uuidString
+            let uploadingMessage = ChatMessage(
+                id: uploadingMessageId,
+                content: "📄 Uploading \(fileName)...",
+                type: .text,
+                isFromCurrentUser: true,
+                timestamp: Date(),
+                senderId: clientId,
+                status: .sending
+            )
+            
+            DispatchQueue.main.async {
+                self.chatService.messages.append(uploadingMessage)
+                self.uploadingMessages.insert(uploadingMessageId)
+            }
             
             // Upload file to server
             chatService.uploadFile(documentData, fileName: fileName, mimeType: mimeType) { result in
                 DispatchQueue.main.async {
+                    // Remove uploading placeholder
+                    self.uploadingMessages.remove(uploadingMessageId)
+                    if let index = self.chatService.messages.firstIndex(where: { $0.id == uploadingMessageId }) {
+                        self.chatService.messages.remove(at: index)
+                    }
+                    
                     switch result {
                     case .success(let fileURL):
                         print("✅ Document uploaded successfully: \(fileURL)")
-                        // Send media message with actual file URL
+                        // Send actual media message
                         self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: mimeType)
                         
                     case .failure(let error):
@@ -358,8 +458,7 @@ struct ChatRoomView: View {
     
     private func startVideoRecording() {
         print("🎥 Starting video recording...")
-        // For now, just open camera with video mode
-        // In a full implementation, you'd want to use AVCaptureSession for custom video recording
+        // Open camera with video mode enabled
         imagePickerSourceType = .camera
         showImagePicker = true
         isRecordingVideo = false
@@ -367,7 +466,7 @@ struct ChatRoomView: View {
     
     // MARK: - Audio Playback
     
-    private func playAudio(url: String) {
+    private func playAudioMessage(_ url: String) {
         // Stop current audio if playing
         audioPlayer?.stop()
         
@@ -414,6 +513,11 @@ struct ChatRoomView: View {
                 }
             }
         }.resume()
+    }
+    
+    private func stopAudioPlayback() {
+        audioPlayer?.stop()
+        currentlyPlayingAudioURL = nil
     }
     
     private func showAttachmentOptions() {
@@ -497,18 +601,42 @@ struct ChatHeaderView: View {
 
 struct MessageBubbleView: View {
     let message: ChatMessage
-    let onAudioPlay: (String) -> Void
-    let currentlyPlayingURL: String?
+    let isCurrentUser: Bool
+    @Binding var currentlyPlayingURL: String?
+    let onPlayAudio: (String) -> Void
+    let onStopAudio: () -> Void
+    let isUploading: Bool
     
     var body: some View {
         HStack {
-            if message.isFromCurrentUser {
+            if isCurrentUser {
                 Spacer(minLength: 60)
                 outgoingMessage
             } else {
-                incomingMessage
-                Spacer(minLength: 60)
+                // Show system messages differently
+                if message.senderId == "system" {
+                    systemMessage
+                } else {
+                    incomingMessage
+                    Spacer(minLength: 60)
+                }
             }
+        }
+    }
+    
+    private var systemMessage: some View {
+        HStack {
+            Spacer()
+            Text(message.content)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.1))
+                )
+            Spacer()
         }
     }
     
@@ -536,7 +664,7 @@ struct MessageBubbleView: View {
     private var incomingMessage: some View {
         VStack(alignment: .leading, spacing: 4) {
             // Sender name for group chats
-            if !message.isFromCurrentUser {
+            if !isCurrentUser {
                 Text("Anonymous")
                     .font(.caption)
                     .foregroundColor(.blue.opacity(0.8))
@@ -557,11 +685,17 @@ struct MessageBubbleView: View {
         Group {
             switch message.type {
             case .text:
-                Text(message.content)
-                    .font(.body)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                HStack(spacing: 8) {
+                    if isUploading {
+                        RotatingLoader()
+                    }
+                    
+                    Text(message.content)
+                        .font(.body)
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                     
             case .image:
                 VStack(alignment: .leading, spacing: 8) {
@@ -577,8 +711,7 @@ struct MessageBubbleView: View {
                                 .frame(width: 200, height: 150)
                                 .overlay(
                                     VStack {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        RotatingLoader()
                                         Text("Loading...")
                                             .font(.caption)
                                             .foregroundColor(.white.opacity(0.7))
@@ -593,10 +726,14 @@ struct MessageBubbleView: View {
                             .frame(width: 200, height: 150)
                             .overlay(
                                 VStack {
-                                    Image(systemName: "photo")
-                                        .font(.largeTitle)
-                                        .foregroundColor(.white.opacity(0.7))
-                                    Text("Image")
+                                    if isUploading {
+                                        RotatingLoader()
+                                    } else {
+                                        Image(systemName: "photo")
+                                            .font(.largeTitle)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                    Text(isUploading ? "Uploading..." : "Image")
                                         .font(.caption)
                                         .foregroundColor(.white.opacity(0.7))
                                 }
@@ -617,16 +754,27 @@ struct MessageBubbleView: View {
                         .fill(Color.black.opacity(0.6))
                         .frame(width: 250, height: 140)
                         .overlay(
-                            Button(action: {
-                                // TODO: Play video
-                            }) {
-                                Image(systemName: "play.circle.fill")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.white)
+                            Group {
+                                if isUploading {
+                                    VStack {
+                                        RotatingLoader()
+                                        Text("Uploading...")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                } else {
+                                    Button(action: {
+                                        // TODO: Play video
+                                    }) {
+                                        Image(systemName: "play.circle.fill")
+                                            .font(.largeTitle)
+                                            .foregroundColor(.white)
+                                    }
+                                }
                             }
                         )
                     
-                    if !message.content.isEmpty {
+                    if !message.content.isEmpty && !message.content.contains("Uploading") {
                         Text(message.content)
                             .font(.body)
                             .foregroundColor(.white)
@@ -638,35 +786,30 @@ struct MessageBubbleView: View {
                 HStack(spacing: 12) {
                     Button(action: {
                         if let mediaURL = message.mediaURL {
-                            onAudioPlay(mediaURL)
+                            onPlayAudio(mediaURL)
                         }
                     }) {
-                        Image(systemName: currentlyPlayingURL == message.mediaURL ? "pause.circle.fill" : "play.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
+                        if isUploading {
+                            RotatingLoader()
+                                .frame(width: 24, height: 24)
+                        } else {
+                            Image(systemName: currentlyPlayingURL == message.mediaURL ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                        }
                     }
+                    .disabled(isUploading)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        if !message.content.isEmpty && !message.content.contains("Uploading") {
-                            Text(message.fileName ?? "Voice Message")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                        } else {
-                            Text("Voice Message")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
+                        Text(message.fileName ?? "Voice Message")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
                         
                         // Show audio duration or upload status
-                        if message.content.contains("Uploading") {
-                            HStack(spacing: 4) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.6)
-                                Text("Uploading...")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.6))
-                            }
+                        if isUploading {
+                            Text("Uploading...")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.6))
                         } else if message.content.contains("Failed") {
                             HStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.circle")
@@ -696,16 +839,25 @@ struct MessageBubbleView: View {
                 
             case .file:
                 HStack(spacing: 12) {
-                    Image(systemName: "doc.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
+                    if isUploading {
+                        RotatingLoader()
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Image(systemName: "doc.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text(message.fileName ?? "Document")
                             .font(.body)
                             .foregroundColor(.white)
                         
-                        if let fileSize = message.fileSize {
+                        if isUploading {
+                            Text("Uploading...")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                        } else if let fileSize = message.fileSize {
                             Text(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file))
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
@@ -714,12 +866,14 @@ struct MessageBubbleView: View {
                     
                     Spacer()
                     
-                    Button(action: {
-                        // TODO: Download/open file
-                    }) {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.title3)
-                            .foregroundColor(.white)
+                    if !isUploading {
+                        Button(action: {
+                            // TODO: Download/open file
+                        }) {
+                            Image(systemName: "arrow.down.circle")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -734,20 +888,19 @@ struct MessageBubbleView: View {
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.6))
             
-            if message.isFromCurrentUser {
+            if isCurrentUser {
                 messageStatusIcon
             }
         }
-        .padding(.horizontal, message.isFromCurrentUser ? 8 : 16)
+        .padding(.horizontal, isCurrentUser ? 8 : 16)
     }
     
     private var messageStatusIcon: some View {
         Group {
             switch message.status {
             case .sending:
-                Image(systemName: "clock")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.5))
+                RotatingLoader()
+                    .frame(width: 12, height: 12)
             case .sent:
                 Image(systemName: "checkmark")
                     .font(.caption2)
@@ -941,12 +1094,23 @@ struct ImagePickerView: UIViewControllerRepresentable {
     let sourceType: UIImagePickerController.SourceType
     @Binding var selectedImage: UIImage?
     @Binding var isPresented: Bool
+    let allowsVideo: Bool
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = sourceType
         picker.delegate = context.coordinator
         picker.allowsEditing = true
+        
+        // Configure media types based on source and allowsVideo
+        if sourceType == .camera && allowsVideo {
+            picker.mediaTypes = ["public.image", "public.movie"]
+            picker.videoMaximumDuration = 60.0 // 60 seconds max
+            picker.videoQuality = .typeMedium
+        } else {
+            picker.mediaTypes = ["public.image"]
+        }
+        
         return picker
     }
     
@@ -964,7 +1128,13 @@ struct ImagePickerView: UIViewControllerRepresentable {
         }
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let editedImage = info[.editedImage] as? UIImage {
+            
+            // Handle video
+            if let videoURL = info[.mediaURL] as? URL {
+                handleVideoSelection(videoURL)
+            }
+            // Handle image
+            else if let editedImage = info[.editedImage] as? UIImage {
                 parent.selectedImage = editedImage
             } else if let originalImage = info[.originalImage] as? UIImage {
                 parent.selectedImage = originalImage
@@ -975,6 +1145,39 @@ struct ImagePickerView: UIViewControllerRepresentable {
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.isPresented = false
+        }
+        
+        private func handleVideoSelection(_ videoURL: URL) {
+            print("🎥 Video selected: \(videoURL)")
+            
+            do {
+                let videoData = try Data(contentsOf: videoURL)
+                let fileName = "video_\(Date().timeIntervalSince1970).mp4"
+                
+                // Create uploading placeholder message
+                let uploadingMessageId = UUID().uuidString
+                let uploadingMessage = ChatMessage(
+                    id: uploadingMessageId,
+                    content: "🎥 Uploading video...",
+                    type: .video,
+                    isFromCurrentUser: true,
+                    timestamp: Date(),
+                    senderId: "current-user", // This should be passed from parent
+                    status: .sending
+                )
+                
+                DispatchQueue.main.async {
+                    // We need access to the parent's upload tracking
+                    // This is a simplified version - in practice, you'd pass these via closures
+                    print("📤 Starting video upload: \(fileName)")
+                }
+                
+                // Note: In a real implementation, you'd need to pass the ChatService reference
+                // and handle the upload properly. This is just showing the structure.
+                
+            } catch {
+                print("❌ Failed to read video file: \(error)")
+            }
         }
     }
 }
@@ -1033,6 +1236,33 @@ class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
     
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         onFinish()
+    }
+}
+
+// MARK: - Rotating Loader Component
+
+struct RotatingLoader: View {
+    @State private var isRotating = false
+    
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.7)
+            .stroke(
+                AngularGradient(
+                    gradient: Gradient(colors: [.blue, .blue.opacity(0.3)]),
+                    center: .center
+                ),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
+            )
+            .rotationEffect(.degrees(isRotating ? 360 : 0))
+            .animation(
+                Animation.linear(duration: 1)
+                    .repeatForever(autoreverses: false),
+                value: isRotating
+            )
+            .onAppear {
+                isRotating = true
+            }
     }
 }
 

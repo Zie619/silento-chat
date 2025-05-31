@@ -895,6 +895,18 @@ class ChatService: ObservableObject {
                     await MainActor.run {
                         if !peers.contains(peerId) {
                             peers.append(peerId)
+                            
+                            // Add system message for user joined
+                            let joinMessage = ChatMessage(
+                                id: UUID().uuidString,
+                                content: "👋 A user joined the room",
+                                type: .text,
+                                isFromCurrentUser: false,
+                                timestamp: Date(),
+                                senderId: "system",
+                                status: .delivered
+                            )
+                            messages.append(joinMessage)
                         }
                     }
                     print("👋 Peer joined: \(peerId)")
@@ -903,7 +915,21 @@ class ChatService: ObservableObject {
             case "peer-left":
                 if let peerId = json["clientId"] as? String {
                     await MainActor.run {
-                        peers.removeAll { $0 == peerId }
+                        if peers.contains(peerId) {
+                            peers.removeAll { $0 == peerId }
+                            
+                            // Add system message for user left
+                            let leaveMessage = ChatMessage(
+                                id: UUID().uuidString,
+                                content: "👋 A user left the room",
+                                type: .text,
+                                isFromCurrentUser: false,
+                                timestamp: Date(),
+                                senderId: "system",
+                                status: .delivered
+                            )
+                            messages.append(leaveMessage)
+                        }
                     }
                     print("👋 Peer left: \(peerId)")
                 }
