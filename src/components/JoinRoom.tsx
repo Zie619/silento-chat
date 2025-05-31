@@ -61,7 +61,7 @@ function JoinRoom({ onRoomJoined, onBack }: JoinRoomProps) {
           </svg>
         </button>
         <h1>Join Room</h1>
-        <div style={{ width: 40 }} />
+        <div className="header-spacer" />
       </div>
 
       <form onSubmit={handleJoinRoom} className="content">

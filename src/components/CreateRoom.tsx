@@ -44,7 +44,7 @@ function CreateRoom({ onRoomCreated, onBack }: CreateRoomProps) {
           </svg>
         </button>
         <h1>Create Room</h1>
-        <div style={{ width: 40 }} />
+        <div className="header-spacer" />
       </div>
 
       <div className="content">

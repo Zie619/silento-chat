@@ -15,10 +15,6 @@ function App() {
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
 
   useEffect(() => {
-    console.log('Screen changed to:', currentScreen);
-  }, [currentScreen]);
-
-  useEffect(() => {
     const initializeApp = async () => {
       // Generate unique client ID
       const storedClientId = sessionStorage.getItem('clientId');
@@ -53,7 +49,6 @@ function App() {
   };
 
   const renderContent = () => {
-    console.log('Current screen:', currentScreen);
     switch (currentScreen) {
       case 'loading':
         return (
@@ -107,10 +102,7 @@ function App() {
                 <button 
                   type="button"
                   className="action-btn primary" 
-                  onClick={() => {
-                    console.log('Create Room clicked');
-                    setCurrentScreen('createRoom');
-                  }}
+                  onClick={() => setCurrentScreen('createRoom')}
                 >
                   <div className="btn-content">
                     <div className="btn-icon">🔐</div>
@@ -124,10 +116,7 @@ function App() {
                 <button 
                   type="button"
                   className="action-btn" 
-                  onClick={() => {
-                    console.log('Join Room clicked');
-                    setCurrentScreen('joinRoom');
-                  }}
+                  onClick={() => setCurrentScreen('joinRoom')}
                 >
                   <div className="btn-content">
                     <div className="btn-icon">🔗</div>
@@ -158,28 +147,12 @@ function App() {
         );
       
       default:
-        console.error('Unknown screen:', currentScreen);
         return null;
     }
   };
 
   return (
     <div className="app">
-      <div style={{ position: 'fixed', top: 10, right: 10, zIndex: 1000, background: 'red', padding: '10px', borderRadius: '5px' }}>
-        <div style={{ color: 'white', marginBottom: '5px' }}>Screen: {currentScreen}</div>
-        <button 
-          style={{ background: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px', marginRight: '5px' }}
-          onClick={() => setCurrentScreen('createRoom')}
-        >
-          Test Create
-        </button>
-        <button 
-          style={{ background: 'white', border: 'none', padding: '5px 10px', borderRadius: '3px' }}
-          onClick={() => setCurrentScreen('joinRoom')}
-        >
-          Test Join
-        </button>
-      </div>
       {renderContent()}
     </div>
   );
