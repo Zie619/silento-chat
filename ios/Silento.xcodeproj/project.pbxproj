@@ -7,21 +7,34 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2A3B4C5D6E7F8901ABCDEF12 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF13 /* AppDelegate.swift */; };
-		2A3B4C5D6E7F8901ABCDEF14 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF15 /* SceneDelegate.swift */; };
-		2A3B4C5D6E7F8901ABCDEF16 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF17 /* ViewController.swift */; };
 		2A3B4C5D6E7F8901ABCDEF18 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF19 /* Assets.xcassets */; };
 		2A3B4C5D6E7F8901ABCDEF1A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2A3B4C5D6E7F8901ABCDEF1B /* LaunchScreen.storyboard */; };
+		D3CEC1A22DEB1FAA003FD3D9 /* SilentoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC19F2DEB1FAA003FD3D9 /* SilentoApp.swift */; };
+		D3CEC1E82DEB229E003FD3D9 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E32DEB229E003FD3D9 /* HomeView.swift */; };
+		D3CEC1EA2DEB229E003FD3D9 /* ParticleBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */; };
+		D3CEC1EB2DEB229E003FD3D9 /* CreateRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E22DEB229E003FD3D9 /* CreateRoomView.swift */; };
+		D3CEC1EC2DEB229E003FD3D9 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E02DEB229E003FD3D9 /* ChatService.swift */; };
+		D3CEC1ED2DEB229E003FD3D9 /* JoinRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E42DEB229E003FD3D9 /* JoinRoomView.swift */; };
+		D3CEC1EE2DEB229E003FD3D9 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */; };
+		D3CEC1EF2DEB229E003FD3D9 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1DF2DEB229E003FD3D9 /* ChatRoomView.swift */; };
+		D3CEC1F02DEB229E003FD3D9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CEC1E12DEB229E003FD3D9 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2A3B4C5D6E7F8901ABCDEF13 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		2A3B4C5D6E7F8901ABCDEF15 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		2A3B4C5D6E7F8901ABCDEF17 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		2A3B4C5D6E7F8901ABCDEF19 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A3B4C5D6E7F8901ABCDEF1C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		2A3B4C5D6E7F8901ABCDEF1D /* Silento.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Silento.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2A3B4C5D6E7F8901ABCDEF1E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D3CEC19C2DEB1F86003FD3D9 /* Silento-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Silento-Bridging-Header.h"; sourceTree = "<group>"; };
+		D3CEC19F2DEB1FAA003FD3D9 /* SilentoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentoApp.swift; sourceTree = "<group>"; };
+		D3CEC1DF2DEB229E003FD3D9 /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
+		D3CEC1E02DEB229E003FD3D9 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
+		D3CEC1E12DEB229E003FD3D9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D3CEC1E22DEB229E003FD3D9 /* CreateRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRoomView.swift; sourceTree = "<group>"; };
+		D3CEC1E32DEB229E003FD3D9 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		D3CEC1E42DEB229E003FD3D9 /* JoinRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinRoomView.swift; sourceTree = "<group>"; };
+		D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
+		D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBackgroundView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,12 +59,19 @@
 		2A3B4C5D6E7F8901ABCDEF21 /* Silento */ = {
 			isa = PBXGroup;
 			children = (
-				2A3B4C5D6E7F8901ABCDEF13 /* AppDelegate.swift */,
-				2A3B4C5D6E7F8901ABCDEF15 /* SceneDelegate.swift */,
-				2A3B4C5D6E7F8901ABCDEF17 /* ViewController.swift */,
+				D3CEC1DF2DEB229E003FD3D9 /* ChatRoomView.swift */,
+				D3CEC1E02DEB229E003FD3D9 /* ChatService.swift */,
+				D3CEC1E12DEB229E003FD3D9 /* ContentView.swift */,
+				D3CEC1E22DEB229E003FD3D9 /* CreateRoomView.swift */,
+				D3CEC1E32DEB229E003FD3D9 /* HomeView.swift */,
+				D3CEC1E42DEB229E003FD3D9 /* JoinRoomView.swift */,
+				D3CEC1E52DEB229E003FD3D9 /* LoadingView.swift */,
+				D3CEC1E62DEB229E003FD3D9 /* ParticleBackgroundView.swift */,
+				D3CEC19F2DEB1FAA003FD3D9 /* SilentoApp.swift */,
 				2A3B4C5D6E7F8901ABCDEF19 /* Assets.xcassets */,
 				2A3B4C5D6E7F8901ABCDEF1B /* LaunchScreen.storyboard */,
 				2A3B4C5D6E7F8901ABCDEF1E /* Info.plist */,
+				D3CEC19C2DEB1F86003FD3D9 /* Silento-Bridging-Header.h */,
 			);
 			path = Silento;
 			sourceTree = "<group>";
@@ -96,6 +116,7 @@
 				TargetAttributes = {
 					2A3B4C5D6E7F8901ABCDEF23 = {
 						CreatedOnToolsVersion = 15.0;
+						LastSwiftMigration = 1630;
 					};
 				};
 			};
@@ -134,9 +155,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2A3B4C5D6E7F8901ABCDEF16 /* ViewController.swift in Sources */,
-				2A3B4C5D6E7F8901ABCDEF12 /* AppDelegate.swift in Sources */,
-				2A3B4C5D6E7F8901ABCDEF14 /* SceneDelegate.swift in Sources */,
+				D3CEC1A22DEB1FAA003FD3D9 /* SilentoApp.swift in Sources */,
+				D3CEC1E82DEB229E003FD3D9 /* HomeView.swift in Sources */,
+				D3CEC1EA2DEB229E003FD3D9 /* ParticleBackgroundView.swift in Sources */,
+				D3CEC1EB2DEB229E003FD3D9 /* CreateRoomView.swift in Sources */,
+				D3CEC1EC2DEB229E003FD3D9 /* ChatService.swift in Sources */,
+				D3CEC1ED2DEB229E003FD3D9 /* JoinRoomView.swift in Sources */,
+				D3CEC1EE2DEB229E003FD3D9 /* LoadingView.swift in Sources */,
+				D3CEC1EF2DEB229E003FD3D9 /* ChatRoomView.swift in Sources */,
+				D3CEC1F02DEB229E003FD3D9 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,6 +305,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z24WA5CL56;
@@ -294,6 +322,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.silento.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Silento/Silento-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -304,6 +334,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z24WA5CL56;
@@ -320,6 +351,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.silento.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Silento/Silento-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
