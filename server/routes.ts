@@ -20,15 +20,19 @@ const upload = multer({
     // Allow images, videos, audio, and documents
     const allowedTypes = [
       'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/mov', 'video/avi', 'video/webm',
-      'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/aac',
-      'application/pdf', 'text/plain'
+      'video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime',
+      'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp4', 'audio/mpeg',
+      'application/pdf', 'text/plain', 'application/octet-stream'
     ];
     
+    console.log(`📁 File upload attempt: ${file.originalname}, Type: ${file.mimetype}, Size: ${file.size}`);
+    
     if (allowedTypes.includes(file.mimetype)) {
+      console.log(`✅ File type accepted: ${file.mimetype}`);
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type'));
+      console.log(`❌ File type rejected: ${file.mimetype}`);
+      cb(new Error(`Invalid file type: ${file.mimetype}`));
     }
   }
 });
@@ -56,9 +60,14 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
   // File upload endpoint
   app.post('/api/upload', upload.single('file'), (req: any, res: any) => {
     try {
+      console.log('📤 Upload request received');
+      
       if (!req.file) {
+        console.log('❌ No file in request');
         return res.status(400).json({ error: 'No file uploaded' });
       }
+
+      console.log(`📁 Processing file: ${req.file.originalname}, Size: ${req.file.size}, Type: ${req.file.mimetype}`);
 
       // Generate unique file ID
       const fileId = crypto.randomUUID();
@@ -71,6 +80,8 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
         uploadedAt: Date.now()
       });
 
+      console.log(`✅ File stored with ID: ${fileId}`);
+
       res.json({
         fileId,
         fileName: req.file.originalname,
@@ -79,8 +90,11 @@ export function setupRoutes(app: Express, httpServer: HttpServer) {
         url: `/api/file/${fileId}`
       });
     } catch (error) {
-      console.error('Error uploading file:', error);
-      res.status(500).json({ error: 'Failed to upload file' });
+      console.error('❌ Error uploading file:', error);
+      res.status(500).json({ 
+        error: 'Failed to upload file', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      });
     }
   });
 

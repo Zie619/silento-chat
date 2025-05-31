@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import UIKit
+import AVKit
 
 struct ChatRoomView: View {
     @ObservedObject var chatService: ChatService
@@ -14,8 +15,9 @@ struct ChatRoomView: View {
     @State private var showImagePicker = false
     @State private var showDocumentPicker = false
     @State private var showMediaOptions = false
-    @State private var imagePickerSourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var imagePickerSourceType: UIImagePickerController.SourceType = .camera
     @State private var selectedImage: UIImage?
+    @State private var selectedVideoURL: URL?
     @State private var isRecordingAudio = false
     @State private var isRecordingVideo = false
     @State private var audioRecorder: AVAudioRecorder?
@@ -25,9 +27,10 @@ struct ChatRoomView: View {
     @State private var recordingDuration: TimeInterval = 0
     @State private var currentlyPlayingAudioURL: String?
     @State private var audioPlayerDelegate: AudioPlayerDelegate?
+    @State private var showVideoPlayer = false
+    @State private var videoPlayerURL: URL?
     @FocusState private var isMessageFieldFocused: Bool
     @State private var uploadingMessages: Set<String> = []
-    @State private var previousPeerCount = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -88,7 +91,9 @@ struct ChatRoomView: View {
                                 currentlyPlayingURL: $currentlyPlayingAudioURL,
                                 onPlayAudio: playAudioMessage,
                                 onStopAudio: stopAudioPlayback,
-                                isUploading: uploadingMessages.contains(message.id)
+                                isUploading: uploadingMessages.contains(message.id),
+                                showVideoPlayer: $showVideoPlayer,
+                                videoPlayerURL: $videoPlayerURL
                             )
                             .id(message.id)
                         }
@@ -103,23 +108,6 @@ struct ChatRoomView: View {
                         }
                     }
                 }
-                .onChange(of: chatService.peers.count) { newCount in
-                    // Add user join/leave messages
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        if previousPeerCount > 0 { // Only show messages after initial load
-                            if newCount > previousPeerCount {
-                                // User joined
-                                let joinMessage = "👋 A user joined the room"
-                                addSystemMessage(joinMessage)
-                            } else if newCount < previousPeerCount {
-                                // User left
-                                let leaveMessage = "👋 A user left the room"
-                                addSystemMessage(leaveMessage)
-                            }
-                        }
-                        previousPeerCount = newCount
-                    }
-                }
             }
             
             // Message input
@@ -129,7 +117,7 @@ struct ChatRoomView: View {
                 onSend: sendMessage,
                 onAttachmentTap: showAttachmentOptions,
                 onCameraTap: {
-                    // Direct camera access for photos - first tap goes to camera
+                    // Always open camera directly for photos - ensure source type is set correctly
                     imagePickerSourceType = .camera
                     showImagePicker = true
                 },
@@ -154,11 +142,11 @@ struct ChatRoomView: View {
             ActionSheet(
                 title: Text("Attach Media"),
                 buttons: [
-                    .default(Text("Photo Library")) {
+                    .default(Text("📷 Photo Library")) {
                         imagePickerSourceType = .photoLibrary
                         showImagePicker = true
                     },
-                    .default(Text("Document")) {
+                    .default(Text("📄 Document")) {
                         showDocumentPicker = true
                     },
                     .cancel()
@@ -169,6 +157,7 @@ struct ChatRoomView: View {
             ImagePickerView(
                 sourceType: imagePickerSourceType,
                 selectedImage: $selectedImage,
+                selectedVideoURL: $selectedVideoURL,
                 isPresented: $showImagePicker,
                 allowsVideo: imagePickerSourceType == .camera // Allow video when using camera
             )
@@ -178,6 +167,11 @@ struct ChatRoomView: View {
                 isPresented: $showDocumentPicker,
                 onDocumentSelected: handleDocumentSelection
             )
+        }
+        .sheet(isPresented: $showVideoPlayer) {
+            if let videoURL = videoPlayerURL {
+                VideoPlayerView(url: videoURL)
+            }
         }
         .alert("Leave Room", isPresented: $showLeaveAlert) {
             Button("Cancel", role: .cancel) { }
@@ -193,11 +187,14 @@ struct ChatRoomView: View {
                 selectedImage = nil
             }
         }
+        .onChange(of: selectedVideoURL) { videoURL in
+            if let videoURL = videoURL {
+                handleVideoSelection(videoURL)
+                selectedVideoURL = nil
+            }
+        }
         .onTapGesture {
             isMessageFieldFocused = false
-        }
-        .onAppear {
-            previousPeerCount = chatService.peers.count
         }
     }
     
@@ -314,8 +311,8 @@ struct ChatRoomView: View {
                 self.uploadingMessages.insert(uploadingMessageId)
             }
             
-            // Upload to server
-            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/mp4") { result in
+            // Upload to server with correct mime type
+            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/m4a") { result in
                 DispatchQueue.main.async {
                     // Remove uploading placeholder
                     self.uploadingMessages.remove(uploadingMessageId)
@@ -326,7 +323,7 @@ struct ChatRoomView: View {
                     switch result {
                     case .success(let fileURL):
                         print("✅ Voice message uploaded: \(fileURL)")
-                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/mp4")
+                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/m4a")
                         
                     case .failure(let error):
                         print("❌ Failed to upload voice message: \(error)")
@@ -523,6 +520,59 @@ struct ChatRoomView: View {
     private func showAttachmentOptions() {
         showMediaOptions = true
     }
+    
+    private func handleVideoSelection(_ videoURL: URL) {
+        print("🎥 Video selected: \(videoURL.lastPathComponent)")
+        
+        do {
+            let videoData = try Data(contentsOf: videoURL)
+            let fileName = "video_\(Date().timeIntervalSince1970).mp4"
+            
+            // Create uploading placeholder message with loading indicator
+            let uploadingMessageId = UUID().uuidString
+            let uploadingMessage = ChatMessage(
+                id: uploadingMessageId,
+                content: "🎥 Uploading video...",
+                type: .video,
+                isFromCurrentUser: true,
+                timestamp: Date(),
+                senderId: clientId,
+                status: .sending
+            )
+            
+            DispatchQueue.main.async {
+                self.chatService.messages.append(uploadingMessage)
+                self.uploadingMessages.insert(uploadingMessageId)
+            }
+            
+            // Upload file to server
+            chatService.uploadFile(videoData, fileName: fileName, mimeType: "video/mp4") { result in
+                DispatchQueue.main.async {
+                    // Remove uploading placeholder
+                    self.uploadingMessages.remove(uploadingMessageId)
+                    if let index = self.chatService.messages.firstIndex(where: { $0.id == uploadingMessageId }) {
+                        self.chatService.messages.remove(at: index)
+                    }
+                    
+                    switch result {
+                    case .success(let fileURL):
+                        print("✅ Video uploaded successfully: \(fileURL)")
+                        // Send actual media message
+                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "video/mp4")
+                        
+                    case .failure(let error):
+                        print("❌ Failed to upload video: \(error)")
+                        // Send error message
+                        self.chatService.sendMessage("❌ Failed to upload video: \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+        } catch {
+            print("❌ Failed to read video file: \(error)")
+            chatService.sendMessage("❌ Failed to read video file: \(error.localizedDescription)")
+        }
+    }
 }
 
 struct ChatHeaderView: View {
@@ -606,6 +656,8 @@ struct MessageBubbleView: View {
     let onPlayAudio: (String) -> Void
     let onStopAudio: () -> Void
     let isUploading: Bool
+    @Binding var showVideoPlayer: Bool
+    @Binding var videoPlayerURL: URL?
     
     var body: some View {
         HStack {
@@ -764,11 +816,20 @@ struct MessageBubbleView: View {
                                     }
                                 } else {
                                     Button(action: {
-                                        // TODO: Play video
+                                        if let mediaURL = message.mediaURL, let url = URL(string: mediaURL) {
+                                            // Set the video URL and show player
+                                            videoPlayerURL = url
+                                            showVideoPlayer = true
+                                        }
                                     }) {
-                                        Image(systemName: "play.circle.fill")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.white)
+                                        VStack {
+                                            Image(systemName: "play.circle.fill")
+                                                .font(.largeTitle)
+                                                .foregroundColor(.white)
+                                            Text("Play Video")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.8))
+                                        }
                                     }
                                 }
                             }
@@ -1093,6 +1154,7 @@ struct RoomInfoView: View {
 struct ImagePickerView: UIViewControllerRepresentable {
     let sourceType: UIImagePickerController.SourceType
     @Binding var selectedImage: UIImage?
+    @Binding var selectedVideoURL: URL?
     @Binding var isPresented: Bool
     let allowsVideo: Bool
     
@@ -1131,7 +1193,7 @@ struct ImagePickerView: UIViewControllerRepresentable {
             
             // Handle video
             if let videoURL = info[.mediaURL] as? URL {
-                handleVideoSelection(videoURL)
+                parent.selectedVideoURL = videoURL
             }
             // Handle image
             else if let editedImage = info[.editedImage] as? UIImage {
@@ -1145,39 +1207,6 @@ struct ImagePickerView: UIViewControllerRepresentable {
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.isPresented = false
-        }
-        
-        private func handleVideoSelection(_ videoURL: URL) {
-            print("🎥 Video selected: \(videoURL)")
-            
-            do {
-                let videoData = try Data(contentsOf: videoURL)
-                let fileName = "video_\(Date().timeIntervalSince1970).mp4"
-                
-                // Create uploading placeholder message
-                let uploadingMessageId = UUID().uuidString
-                let uploadingMessage = ChatMessage(
-                    id: uploadingMessageId,
-                    content: "🎥 Uploading video...",
-                    type: .video,
-                    isFromCurrentUser: true,
-                    timestamp: Date(),
-                    senderId: "current-user", // This should be passed from parent
-                    status: .sending
-                )
-                
-                DispatchQueue.main.async {
-                    // We need access to the parent's upload tracking
-                    // This is a simplified version - in practice, you'd pass these via closures
-                    print("📤 Starting video upload: \(fileName)")
-                }
-                
-                // Note: In a real implementation, you'd need to pass the ChatService reference
-                // and handle the upload properly. This is just showing the structure.
-                
-            } catch {
-                print("❌ Failed to read video file: \(error)")
-            }
         }
     }
 }
@@ -1263,6 +1292,28 @@ struct RotatingLoader: View {
             .onAppear {
                 isRotating = true
             }
+    }
+}
+
+// MARK: - Video Player View
+
+struct VideoPlayerView: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VideoPlayer(player: AVPlayer(url: url))
+                .navigationTitle("Video")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                }
+        }
     }
 }
 

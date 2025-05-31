@@ -38,8 +38,8 @@ class ChatService: ObservableObject {
     
     // Server discovery - Railway production server (much better than Render!)
     private let serverURLs = [
-        "https://silento-back-production.up.railway.app",  // Railway production server  
-        "http://localhost:8000"                           // Local test server with fixes
+        "https://silento-back-production.up.railway.app", // Railway production server (primary)
+        "http://localhost:8000"                           // Local test server (fallback only)
     ]
     
     init() {
@@ -965,13 +965,17 @@ class ChatService: ObservableObject {
     }
     
     private func performFileUpload(data: Data, fileName: String, mimeType: String) async throws -> String {
-        guard let serverURL = serverURLs.first,
+        guard let serverURL = currentServerURL ?? serverURLs.first,
               let uploadURL = URL(string: "\(serverURL)/api/upload") else {
             throw NetworkError.invalidURL
         }
         
+        print("📤 Uploading file to: \(uploadURL)")
+        print("📊 File size: \(data.count) bytes, Type: \(mimeType)")
+        
         var request = URLRequest(url: uploadURL)
         request.httpMethod = "POST"
+        request.timeoutInterval = 120.0 // 2 minutes for large files
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -987,17 +991,29 @@ class ChatService: ObservableObject {
         
         let (responseData, response) = try await urlSession.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw NetworkError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        print("📡 Upload response status: \(httpResponse.statusCode)")
+        
+        if httpResponse.statusCode != 200 {
+            if let errorData = String(data: responseData, encoding: .utf8) {
+                print("❌ Upload error response: \(errorData)")
+            }
+            throw NetworkError.serverError(httpResponse.statusCode)
         }
         
         let json = try JSONSerialization.jsonObject(with: responseData) as? [String: Any]
+        print("📋 Upload response: \(json ?? [:])")
+        
         guard let fileURL = json?["url"] as? String else {
             throw NetworkError.noFileURL
         }
         
-        return serverURL + fileURL
+        let fullURL = serverURL + fileURL
+        print("✅ File uploaded successfully: \(fullURL)")
+        return fullURL
     }
     
     func sendMediaMessage(fileURL: String, fileName: String, mimeType: String) {
