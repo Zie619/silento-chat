@@ -244,23 +244,56 @@ struct CreateRoomView: View {
     }
     
     private func waitForConnection() {
-        // Check connection status every 0.5 seconds
+        print("🔄 Starting connection wait loop...")
+        
+        // Create a more reliable connection monitoring system
+        var attempts = 0
+        let maxAttempts = 20 // 10 seconds total
+        
         Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+            attempts += 1
+            
             DispatchQueue.main.async {
+                print("🔍 Connection check \(attempts): isConnected=\(self.chatService.isConnected), status=\(self.chatService.connectionStatus)")
+                
+                // Check if we're fully connected
                 if self.chatService.isConnected && self.chatService.connectionStatus == .connected {
                     // Connection fully established
+                    print("✅ Connection confirmed - navigating to chat room")
                     timer.invalidate()
                     self.isLoading = false
                     self.showChatRoom = true
-                    print("✅ Fully connected, navigating to chat room")
-                } else if self.chatService.connectionStatus == .failed {
-                    // Connection failed
+                    return
+                }
+                
+                // Check for failure states
+                if self.chatService.connectionStatus == .failed {
+                    print("❌ Connection failed - stopping wait")
                     timer.invalidate()
                     self.isLoading = false
                     self.errorMessage = "Failed to connect to the room"
-                    print("❌ Connection failed, stopping wait")
+                    return
                 }
-                // Continue waiting if still connecting...
+                
+                // Check for timeout
+                if attempts >= maxAttempts {
+                    print("⏰ Connection timeout - forcing navigation")
+                    timer.invalidate()
+                    
+                    // If we have a room ID and the basic connection seems established, try to navigate anyway
+                    if self.createdRoomId != nil && self.chatService.currentRoomId != nil {
+                        print("🚀 Forcing navigation with available room ID")
+                        self.isLoading = false
+                        self.showChatRoom = true
+                    } else {
+                        self.isLoading = false
+                        self.errorMessage = "Connection timed out. Please try again."
+                    }
+                    return
+                }
+                
+                // Continue waiting...
+                print("⏳ Still waiting for connection... (attempt \(attempts)/\(maxAttempts))")
             }
         }
     }

@@ -362,12 +362,8 @@ class ChatService: ObservableObject {
         print("📡 Sending WebSocket init message for room: \(roomId)")
         try await sendWebSocketMessage(initMessage)
         
-        await MainActor.run {
-            isConnected = true
-            connectionStatus = .connected
-        }
-        
-        print("✅ WebSocket connected and listening")
+        // Don't set connection status here - wait for init-success response
+        print("✅ WebSocket init message sent, waiting for server response...")
         
         // Start listening for messages
         Task {
@@ -834,10 +830,22 @@ class ChatService: ObservableObject {
                 if let peers = json["peers"] as? [String] {
                     await MainActor.run {
                         self.peers = peers
-                        isConnected = true
-                        connectionStatus = .connected
+                        self.isConnected = true
+                        self.connectionStatus = .connected
+                        print("🔄 State updated: isConnected=\(self.isConnected), status=\(self.connectionStatus)")
                     }
                     print("✅ Room joined successfully with \(peers.count) peers")
+                    print("✅ Connection fully established - ready for UI navigation")
+                } else {
+                    print("⚠️ Received init-success but no peers array")
+                    await MainActor.run {
+                        self.peers = []
+                        self.isConnected = true
+                        self.connectionStatus = .connected
+                        print("🔄 State updated: isConnected=\(self.isConnected), status=\(self.connectionStatus)")
+                    }
+                    print("✅ Room joined successfully with 0 peers")
+                    print("✅ Connection fully established - ready for UI navigation")
                 }
                 
             case "message":

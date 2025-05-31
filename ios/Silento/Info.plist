@@ -45,6 +45,8 @@
 	<string>Silento needs microphone access to record voice messages and for video calls.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Silento needs photo library access to share images and videos in chat.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Silento needs permission to save downloaded images and videos to your photo library.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

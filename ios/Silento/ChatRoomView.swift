@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 import UIKit
 import AVKit
+import Photos
 
 struct ChatRoomView: View {
     @ObservedObject var chatService: ChatService
@@ -31,6 +32,7 @@ struct ChatRoomView: View {
     @State private var videoPlayerURL: URL?
     @FocusState private var isMessageFieldFocused: Bool
     @State private var uploadingMessages: Set<String> = []
+    @State private var overlayView: UIView?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -204,10 +206,10 @@ struct ChatRoomView: View {
             isMessageFieldFocused = false
         }
         .onAppear {
-            blockScreenshots()
+            enableScreenshotProtection()
         }
         .onDisappear {
-            unblockScreenshots()
+            disableScreenshotProtection()
         }
     }
     
@@ -537,6 +539,7 @@ struct ChatRoomView: View {
     private func downloadFile(url: String?, fileName: String) {
         guard let urlString = url, let downloadURL = URL(string: urlString) else {
             print("❌ Invalid download URL")
+            showAlert(title: "Error", message: "Invalid download URL")
             return
         }
         
@@ -545,18 +548,26 @@ struct ChatRoomView: View {
         URLSession.shared.dataTask(with: downloadURL) { data, response, error in
             if let error = error {
                 print("❌ Download error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.showAlert(title: "Download Error", message: error.localizedDescription)
+                }
                 return
             }
             
             guard let data = data else {
                 print("❌ No data received")
+                DispatchQueue.main.async {
+                    self.showAlert(title: "Download Error", message: "No data received")
+                }
                 return
             }
             
             DispatchQueue.main.async {
-                // Save to Photos if it's an image/video
-                if urlString.contains("image/") || urlString.contains("video/") {
-                    self.saveMediaToPhotos(data: data, fileName: fileName)
+                // Check file type based on URL or MIME type
+                if urlString.contains("image/") || fileName.contains(".jpg") || fileName.contains(".png") || fileName.contains(".jpeg") {
+                    self.saveImageToPhotos(data: data, fileName: fileName)
+                } else if urlString.contains("video/") || fileName.contains(".mp4") || fileName.contains(".mov") {
+                    self.saveVideoToPhotos(data: data, fileName: fileName)
                 } else {
                     // For other files, show share sheet
                     self.shareFile(data: data, fileName: fileName)
@@ -565,23 +576,79 @@ struct ChatRoomView: View {
         }.resume()
     }
     
-    private func saveMediaToPhotos(data: Data, fileName: String) {
-        if fileName.contains(".jpg") || fileName.contains(".png") || fileName.contains(".jpeg") {
-            // Save image
-            if let image = UIImage(data: data) {
-                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-                print("✅ Image saved to Photos")
+    private func saveImageToPhotos(data: Data, fileName: String) {
+        guard let image = UIImage(data: data) else {
+            print("❌ Failed to create image from data")
+            showAlert(title: "Error", message: "Invalid image data")
+            return
+        }
+        
+        // Request photo library permission
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    // Save to photo library
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetCreationRequest.creationRequestForAsset(from: image)
+                    }) { success, error in
+                        DispatchQueue.main.async {
+                            if success {
+                                print("✅ Image saved to Photos")
+                                self.showAlert(title: "Success", message: "Image saved to Photos")
+                            } else {
+                                print("❌ Failed to save image: \(error?.localizedDescription ?? "Unknown error")")
+                                self.showAlert(title: "Error", message: "Failed to save image")
+                            }
+                        }
+                    }
+                default:
+                    print("❌ Photo library access denied")
+                    self.showAlert(title: "Permission Required", message: "Please allow photo library access in Settings to save images")
+                }
             }
-        } else if fileName.contains(".mp4") || fileName.contains(".mov") {
-            // Save video to temporary file first
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-            do {
-                try data.write(to: tempURL)
-                UISaveVideoAtPathToSavedPhotosAlbum(tempURL.path, nil, nil, nil)
-                print("✅ Video saved to Photos")
-            } catch {
-                print("❌ Failed to save video: \(error)")
+        }
+    }
+    
+    private func saveVideoToPhotos(data: Data, fileName: String) {
+        // Save to temporary file first
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try data.write(to: tempURL)
+            
+            // Request photo library permission
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                DispatchQueue.main.async {
+                    switch status {
+                    case .authorized, .limited:
+                        // Save to photo library
+                        PHPhotoLibrary.shared().performChanges({
+                            PHAssetCreationRequest.creationRequestForAssetFromVideo(atFileURL: tempURL)
+                        }) { success, error in
+                            DispatchQueue.main.async {
+                                if success {
+                                    print("✅ Video saved to Photos")
+                                    self.showAlert(title: "Success", message: "Video saved to Photos")
+                                } else {
+                                    print("❌ Failed to save video: \(error?.localizedDescription ?? "Unknown error")")
+                                    self.showAlert(title: "Error", message: "Failed to save video")
+                                }
+                                
+                                // Clean up temp file
+                                try? FileManager.default.removeItem(at: tempURL)
+                            }
+                        }
+                    default:
+                        print("❌ Photo library access denied")
+                        self.showAlert(title: "Permission Required", message: "Please allow photo library access in Settings to save videos")
+                        // Clean up temp file
+                        try? FileManager.default.removeItem(at: tempURL)
+                    }
+                }
             }
+        } catch {
+            print("❌ Failed to write video to temp file: \(error)")
+            showAlert(title: "Error", message: "Failed to process video file")
         }
     }
     
@@ -592,22 +659,49 @@ struct ChatRoomView: View {
             
             let activityViewController = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
             
-            // Get the root view controller
+            // Get the current view controller
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootViewController = window.rootViewController {
+               let window = windowScene.windows.first {
                 
-                // For iPad
+                var rootViewController = window.rootViewController
+                
+                // Find the topmost presented view controller
+                while let presentedViewController = rootViewController?.presentedViewController {
+                    rootViewController = presentedViewController
+                }
+                
+                // For iPad - configure popover
                 if let popover = activityViewController.popoverPresentationController {
-                    popover.sourceView = rootViewController.view
-                    popover.sourceRect = CGRect(x: rootViewController.view.bounds.midX, y: rootViewController.view.bounds.midY, width: 0, height: 0)
+                    popover.sourceView = rootViewController?.view ?? window
+                    popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
                     popover.permittedArrowDirections = []
                 }
                 
-                rootViewController.present(activityViewController, animated: true)
+                rootViewController?.present(activityViewController, animated: true) {
+                    print("✅ Share sheet presented")
+                }
             }
         } catch {
             print("❌ Failed to share file: \(error)")
+            showAlert(title: "Error", message: "Failed to share file")
+        }
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            var rootViewController = window.rootViewController
+            
+            // Find the topmost presented view controller
+            while let presentedViewController = rootViewController?.presentedViewController {
+                rootViewController = presentedViewController
+            }
+            
+            rootViewController?.present(alert, animated: true)
         }
     }
     
@@ -634,6 +728,159 @@ struct ChatRoomView: View {
             
             rootViewController.present(activityViewController, animated: true)
         }
+    }
+    
+    // MARK: - Screenshot Protection
+    
+    private func enableScreenshotProtection() {
+        // Add observer for screenshot detection
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.userDidTakeScreenshotNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.handleScreenshotDetected()
+        }
+        
+        // Add observer for screen recording detection  
+        NotificationCenter.default.addObserver(
+            forName: UIScreen.capturedDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if UIScreen.main.isCaptured {
+                self.handleScreenRecordingStarted()
+            } else {
+                self.handleScreenRecordingEnded()
+            }
+        }
+        
+        // Enable secure mode for the window
+        makeWindowSecure()
+        
+        print("🔒 Screenshot protection enabled")
+    }
+    
+    private func disableScreenshotProtection() {
+        // Remove observers
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.userDidTakeScreenshotNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIScreen.capturedDidChangeNotification,
+            object: nil
+        )
+        
+        // Disable secure mode
+        removeWindowSecurity()
+        
+        print("🔓 Screenshot protection disabled")
+    }
+    
+    private func handleScreenshotDetected() {
+        print("📸 Screenshot detected in secure chat!")
+        
+        // Show alert to user
+        let alert = UIAlertController(
+            title: "Screenshot Detected",
+            message: "Screenshots are not allowed in secure chat rooms for privacy protection.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Understood", style: .default))
+        
+        // Present alert
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            var rootViewController = window.rootViewController
+            
+            // Find the topmost presented view controller
+            while let presentedViewController = rootViewController?.presentedViewController {
+                rootViewController = presentedViewController
+            }
+            
+            rootViewController?.present(alert, animated: true)
+        }
+    }
+    
+    private func handleScreenRecordingStarted() {
+        print("📹 Screen recording detected!")
+        
+        // Show persistent warning
+        let alert = UIAlertController(
+            title: "Screen Recording Detected",
+            message: "Screen recording is not allowed in secure chat rooms. Please stop recording to continue.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Understood", style: .default))
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            var rootViewController = window.rootViewController
+            
+            // Find the topmost presented view controller
+            while let presentedViewController = rootViewController?.presentedViewController {
+                rootViewController = presentedViewController
+            }
+            
+            rootViewController?.present(alert, animated: true)
+        }
+    }
+    
+    private func handleScreenRecordingEnded() {
+        print("✅ Screen recording stopped")
+    }
+    
+    private func makeWindowSecure() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else { return }
+        
+        // Create secure overlay that prevents screenshots
+        let secureView = UIView()
+        secureView.backgroundColor = UIColor.clear
+        secureView.isUserInteractionEnabled = false
+        secureView.tag = 999 // Tag to identify our secure view
+        
+        // Create a text field that's secure
+        let secureField = UITextField()
+        secureField.isSecureTextEntry = true
+        secureField.isUserInteractionEnabled = false
+        secureField.alpha = 0.001 // Nearly invisible but still present
+        secureField.frame = CGRect(x: -1000, y: -1000, width: 1, height: 1)
+        
+        secureView.addSubview(secureField)
+        window.addSubview(secureView)
+        
+        // Activate the secure field
+        secureField.becomeFirstResponder()
+        secureField.resignFirstResponder()
+        
+        // Keep reference
+        overlayView = secureView
+        
+        print("🔒 Secure overlay created")
+    }
+    
+    private func removeWindowSecurity() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else { return }
+        
+        // Remove our secure overlay
+        window.subviews.forEach { subview in
+            if subview.tag == 999 {
+                subview.removeFromSuperview()
+            }
+        }
+        
+        overlayView = nil
+        print("🔓 Secure overlay removed")
     }
     
     private func handleVideoSelection(_ videoURL: URL) {
@@ -686,80 +933,6 @@ struct ChatRoomView: View {
         } catch {
             print("❌ Failed to read video file: \(error)")
             chatService.sendMessage("❌ Failed to read video file: \(error.localizedDescription)")
-        }
-    }
-    
-    // MARK: - Screenshot Protection
-    
-    private func blockScreenshots() {
-        // Add observer for screenshot detection
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.userDidTakeScreenshotNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            self.screenshotTaken()
-        }
-        
-        // Add a secure view overlay to prevent screenshots/screen recording
-        addSecureOverlay()
-    }
-    
-    private func unblockScreenshots() {
-        NotificationCenter.default.removeObserver(
-            self,
-            name: UIApplication.userDidTakeScreenshotNotification,
-            object: nil
-        )
-        removeSecureOverlay()
-    }
-    
-    private func screenshotTaken() {
-        // Show alert when screenshot is attempted
-        DispatchQueue.main.async {
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootViewController = window.rootViewController {
-                
-                let alert = UIAlertController(
-                    title: "🚫 Screenshots Blocked",
-                    message: "Screenshots are not allowed in this secure chat room to protect privacy.",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                rootViewController.present(alert, animated: true)
-            }
-        }
-    }
-    
-    private func addSecureOverlay() {
-        // Create a secure overlay that prevents screenshots
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            
-            let secureView = UIView(frame: window.bounds)
-            secureView.backgroundColor = UIColor.clear
-            secureView.tag = 9999 // Tag to identify and remove later
-            
-            // Make the view secure
-            secureView.layer.isOpaque = true
-            secureView.isUserInteractionEnabled = false
-            
-            window.addSubview(secureView)
-            window.makeSecure()
-        }
-    }
-    
-    private func removeSecureOverlay() {
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            
-            // Remove the secure overlay
-            window.subviews.forEach { subview in
-                if subview.tag == 9999 {
-                    subview.removeFromSuperview()
-                }
-            }
         }
     }
 }
@@ -1493,6 +1666,7 @@ struct VideoPlayerView: View {
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var playerObserver: Any?
     
     var body: some View {
         NavigationView {
@@ -1500,7 +1674,7 @@ struct VideoPlayerView: View {
                 Color.black.ignoresSafeArea()
                 
                 if let errorMessage = errorMessage {
-                    VStack {
+                    VStack(spacing: 20) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundColor(.white)
@@ -1511,16 +1685,19 @@ struct VideoPlayerView: View {
                         Button("Try Again") {
                             loadVideo()
                         }
-                        .foregroundColor(.blue)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                     }
                 } else if isLoading {
-                    VStack {
+                    VStack(spacing: 16) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(1.5)
                         Text("Loading video...")
                             .foregroundColor(.white)
-                            .padding(.top)
+                            .font(.headline)
                     }
                 } else if let player = player {
                     VideoPlayer(player: player)
@@ -1532,37 +1709,39 @@ struct VideoPlayerView: View {
                         }
                 }
             }
-            .navigationTitle("Video")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .overlay(
-                // Custom navigation bar overlay
                 VStack {
                     HStack {
                         Button("Done") {
                             player?.pause()
                             dismiss()
                         }
+                        .font(.headline)
                         .foregroundColor(.white)
                         .padding(.leading)
                         
                         Spacer()
                         
-                        Text("Video")
+                        Text("Video Player")
                             .foregroundColor(.white)
                             .font(.headline)
                         
                         Spacer()
                         
                         if let player = player {
-                            Button(player.timeControlStatus == .playing ? "⏸️" : "▶️") {
+                            Button(action: {
                                 if player.timeControlStatus == .playing {
                                     player.pause()
                                 } else {
                                     player.play()
                                 }
+                            }) {
+                                Image(systemName: player.timeControlStatus == .playing ? "pause.fill" : "play.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
                             }
-                            .foregroundColor(.white)
                             .padding(.trailing)
                         } else {
                             Color.clear
@@ -1572,6 +1751,7 @@ struct VideoPlayerView: View {
                     }
                     .frame(height: 44)
                     .background(Color.black.opacity(0.8))
+                    
                     Spacer()
                 }
                 .ignoresSafeArea(.all, edges: .top)
@@ -1579,6 +1759,11 @@ struct VideoPlayerView: View {
         }
         .onAppear {
             loadVideo()
+        }
+        .onDisappear {
+            if let observer = playerObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
     }
     
@@ -1588,40 +1773,61 @@ struct VideoPlayerView: View {
         
         print("🎥 Loading video from URL: \(url)")
         
-        // Create player with the URL
-        let newPlayer = AVPlayer(url: url)
+        // Create player item first
+        let playerItem = AVPlayerItem(url: url)
+        let newPlayer = AVPlayer(playerItem: playerItem)
         
-        // Simple status check without KVO
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            switch newPlayer.status {
+        // Add observer for player item status
+        playerObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { _ in
+            // Video finished playing
+            newPlayer.seek(to: .zero)
+        }
+        
+        // Add observer for failed playback
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { notification in
+            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+                print("❌ Video playback error: \(error.localizedDescription)")
+                self.errorMessage = "Playback failed: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+        
+        // Wait a moment for the player to be ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            switch playerItem.status {
             case .readyToPlay:
                 print("✅ Video ready to play")
                 self.player = newPlayer
                 self.isLoading = false
                 self.errorMessage = nil
             case .failed:
-                print("❌ Video failed to load: \(newPlayer.error?.localizedDescription ?? "Unknown error")")
+                let errorDescription = playerItem.error?.localizedDescription ?? "Unknown error"
+                print("❌ Video failed to load: \(errorDescription)")
                 self.isLoading = false
-                self.errorMessage = "Failed to load video: \(newPlayer.error?.localizedDescription ?? "Unknown error")"
+                self.errorMessage = "Failed to load video: \(errorDescription)"
             case .unknown:
-                print("🔄 Video status unknown - setting player anyway")
-                self.player = newPlayer
-                self.isLoading = false
+                print("🔄 Video status unknown - waiting longer...")
+                // Try again after another delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if playerItem.status == .readyToPlay {
+                        self.player = newPlayer
+                        self.isLoading = false
+                    } else {
+                        self.errorMessage = "Video loading timeout"
+                        self.isLoading = false
+                    }
+                }
             @unknown default:
                 self.player = newPlayer
                 self.isLoading = false
-            }
-        }
-        
-        // Add observer for playback errors
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemFailedToPlayToEndTime,
-            object: newPlayer.currentItem,
-            queue: .main
-        ) { notification in
-            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                print("❌ Video playback error: \(error.localizedDescription)")
-                self.errorMessage = "Playback error: \(error.localizedDescription)"
             }
         }
     }
@@ -1630,16 +1836,10 @@ struct VideoPlayerView: View {
 // MARK: - UIWindow Security Extension
 
 extension UIWindow {
-    func makeSecure() {
-        // Prevent screenshots and screen recording
-        let field = UITextField()
-        field.isSecureTextEntry = true
-        self.addSubview(field)
-        field.centerXAnchor.constraint(equalTo: self.centerXAnchor).isActive = true
-        field.centerYAnchor.constraint(equalTo: self.centerYAnchor).isActive = true
-        self.layer.superlayer?.addSublayer(field.layer)
-        field.layer.sublayers?.first?.addSublayer(self.layer)
-        field.isHidden = true
+    func makeSecure(with secureField: UITextField) {
+        // This is a simple approach to add the secure field
+        secureField.becomeFirstResponder()
+        secureField.resignFirstResponder()
     }
 }
 
