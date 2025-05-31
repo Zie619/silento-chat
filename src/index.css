@@ -255,6 +255,16 @@ body::before {
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
+  /* Button reset */
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+  position: relative;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
 }
 
 .action-btn:active {
@@ -270,6 +280,7 @@ body::before {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+  pointer-events: none;
 }
 
 .btn-icon {
@@ -281,11 +292,13 @@ body::before {
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .btn-text {
   flex: 1;
   text-align: left;
+  pointer-events: none;
 }
 
 .action-btn-title {

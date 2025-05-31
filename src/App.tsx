@@ -10,24 +10,13 @@ interface RoomInfo {
   clientId: string;
 }
 
-// Particle Background Component
-const ParticleBackground = () => {
-  return (
-    <div className="particle-container">
-      {[...Array(20)].map((_, i) => (
-        <div key={i} className="particle" style={{
-          left: `${Math.random() * 100}%`,
-          animationDelay: `${Math.random() * 20}s`,
-          animationDuration: `${20 + Math.random() * 20}s`
-        }} />
-      ))}
-    </div>
-  );
-};
-
 function App() {
   const [currentScreen, setCurrentScreen] = useState<AppState>('loading');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+
+  useEffect(() => {
+    console.log('Screen changed to:', currentScreen);
+  }, [currentScreen]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -64,6 +53,7 @@ function App() {
   };
 
   const renderContent = () => {
+    console.log('Current screen:', currentScreen);
     switch (currentScreen) {
       case 'loading':
         return (
@@ -96,7 +86,7 @@ function App() {
           />
         ) : null;
       
-      default:
+      case 'home':
         return (
           <div className="home-screen">
             <div className="home-container">
@@ -114,7 +104,14 @@ function App() {
               </div>
 
               <div className="home-actions">
-                <button className="action-btn primary" onClick={() => setCurrentScreen('createRoom')}>
+                <button 
+                  type="button"
+                  className="action-btn primary" 
+                  onClick={() => {
+                    console.log('Create Room clicked');
+                    setCurrentScreen('createRoom');
+                  }}
+                >
                   <div className="btn-content">
                     <div className="btn-icon">🔐</div>
                     <div className="btn-text">
@@ -124,7 +121,14 @@ function App() {
                   </div>
                 </button>
 
-                <button className="action-btn" onClick={() => setCurrentScreen('joinRoom')}>
+                <button 
+                  type="button"
+                  className="action-btn" 
+                  onClick={() => {
+                    console.log('Join Room clicked');
+                    setCurrentScreen('joinRoom');
+                  }}
+                >
                   <div className="btn-content">
                     <div className="btn-icon">🔗</div>
                     <div className="btn-text">
@@ -152,6 +156,10 @@ function App() {
             </div>
           </div>
         );
+      
+      default:
+        console.error('Unknown screen:', currentScreen);
+        return null;
     }
   };
 
