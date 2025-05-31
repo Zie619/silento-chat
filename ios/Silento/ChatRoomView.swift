@@ -75,6 +75,12 @@ struct ChatRoomView: View {
                         .font(.title2)
                         .foregroundColor(.white)
                 }
+                
+                Button(action: { shareRoom() }) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -93,7 +99,8 @@ struct ChatRoomView: View {
                                 onStopAudio: stopAudioPlayback,
                                 isUploading: uploadingMessages.contains(message.id),
                                 showVideoPlayer: $showVideoPlayer,
-                                videoPlayerURL: $videoPlayerURL
+                                videoPlayerURL: $videoPlayerURL,
+                                onDownloadFile: downloadFile
                             )
                             .id(message.id)
                         }
@@ -195,6 +202,12 @@ struct ChatRoomView: View {
         }
         .onTapGesture {
             isMessageFieldFocused = false
+        }
+        .onAppear {
+            blockScreenshots()
+        }
+        .onDisappear {
+            unblockScreenshots()
         }
     }
     
@@ -521,6 +534,108 @@ struct ChatRoomView: View {
         showMediaOptions = true
     }
     
+    private func downloadFile(url: String?, fileName: String) {
+        guard let urlString = url, let downloadURL = URL(string: urlString) else {
+            print("❌ Invalid download URL")
+            return
+        }
+        
+        print("📥 Downloading file: \(fileName) from \(downloadURL)")
+        
+        URLSession.shared.dataTask(with: downloadURL) { data, response, error in
+            if let error = error {
+                print("❌ Download error: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let data = data else {
+                print("❌ No data received")
+                return
+            }
+            
+            DispatchQueue.main.async {
+                // Save to Photos if it's an image/video
+                if urlString.contains("image/") || urlString.contains("video/") {
+                    self.saveMediaToPhotos(data: data, fileName: fileName)
+                } else {
+                    // For other files, show share sheet
+                    self.shareFile(data: data, fileName: fileName)
+                }
+            }
+        }.resume()
+    }
+    
+    private func saveMediaToPhotos(data: Data, fileName: String) {
+        if fileName.contains(".jpg") || fileName.contains(".png") || fileName.contains(".jpeg") {
+            // Save image
+            if let image = UIImage(data: data) {
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                print("✅ Image saved to Photos")
+            }
+        } else if fileName.contains(".mp4") || fileName.contains(".mov") {
+            // Save video to temporary file first
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            do {
+                try data.write(to: tempURL)
+                UISaveVideoAtPathToSavedPhotosAlbum(tempURL.path, nil, nil, nil)
+                print("✅ Video saved to Photos")
+            } catch {
+                print("❌ Failed to save video: \(error)")
+            }
+        }
+    }
+    
+    private func shareFile(data: Data, fileName: String) {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try data.write(to: tempURL)
+            
+            let activityViewController = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            
+            // Get the root view controller
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootViewController = window.rootViewController {
+                
+                // For iPad
+                if let popover = activityViewController.popoverPresentationController {
+                    popover.sourceView = rootViewController.view
+                    popover.sourceRect = CGRect(x: rootViewController.view.bounds.midX, y: rootViewController.view.bounds.midY, width: 0, height: 0)
+                    popover.permittedArrowDirections = []
+                }
+                
+                rootViewController.present(activityViewController, animated: true)
+            }
+        } catch {
+            print("❌ Failed to share file: \(error)")
+        }
+    }
+    
+    private func shareRoom() {
+        let roomLink = "https://silento-back-production.up.railway.app/?room=\(roomId)"
+        let shareText = "Join my chat room on Silento! 💬\nRoom Code: \(roomId)\nLink: \(roomLink)"
+        
+        let activityViewController = UIActivityViewController(
+            activityItems: [shareText],
+            applicationActivities: [WhatsAppActivity(text: shareText)]
+        )
+        
+        // Get the root view controller
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootViewController = window.rootViewController {
+            
+            // For iPad
+            if let popover = activityViewController.popoverPresentationController {
+                popover.sourceView = rootViewController.view
+                popover.sourceRect = CGRect(x: rootViewController.view.bounds.midX, y: rootViewController.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            
+            rootViewController.present(activityViewController, animated: true)
+        }
+    }
+    
     private func handleVideoSelection(_ videoURL: URL) {
         print("🎥 Video selected: \(videoURL.lastPathComponent)")
         
@@ -571,6 +686,80 @@ struct ChatRoomView: View {
         } catch {
             print("❌ Failed to read video file: \(error)")
             chatService.sendMessage("❌ Failed to read video file: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Screenshot Protection
+    
+    private func blockScreenshots() {
+        // Add observer for screenshot detection
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.userDidTakeScreenshotNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            self.screenshotTaken()
+        }
+        
+        // Add a secure view overlay to prevent screenshots/screen recording
+        addSecureOverlay()
+    }
+    
+    private func unblockScreenshots() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: UIApplication.userDidTakeScreenshotNotification,
+            object: nil
+        )
+        removeSecureOverlay()
+    }
+    
+    private func screenshotTaken() {
+        // Show alert when screenshot is attempted
+        DispatchQueue.main.async {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootViewController = window.rootViewController {
+                
+                let alert = UIAlertController(
+                    title: "🚫 Screenshots Blocked",
+                    message: "Screenshots are not allowed in this secure chat room to protect privacy.",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                rootViewController.present(alert, animated: true)
+            }
+        }
+    }
+    
+    private func addSecureOverlay() {
+        // Create a secure overlay that prevents screenshots
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            let secureView = UIView(frame: window.bounds)
+            secureView.backgroundColor = UIColor.clear
+            secureView.tag = 9999 // Tag to identify and remove later
+            
+            // Make the view secure
+            secureView.layer.isOpaque = true
+            secureView.isUserInteractionEnabled = false
+            
+            window.addSubview(secureView)
+            window.makeSecure()
+        }
+    }
+    
+    private func removeSecureOverlay() {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            
+            // Remove the secure overlay
+            window.subviews.forEach { subview in
+                if subview.tag == 9999 {
+                    subview.removeFromSuperview()
+                }
+            }
         }
     }
 }
@@ -658,6 +847,7 @@ struct MessageBubbleView: View {
     let isUploading: Bool
     @Binding var showVideoPlayer: Bool
     @Binding var videoPlayerURL: URL?
+    let onDownloadFile: (String?, String) -> Void
     
     var body: some View {
         HStack {
@@ -929,7 +1119,7 @@ struct MessageBubbleView: View {
                     
                     if !isUploading {
                         Button(action: {
-                            // TODO: Download/open file
+                            onDownloadFile(message.mediaURL, message.fileName ?? "Document")
                         }) {
                             Image(systemName: "arrow.down.circle")
                                 .font(.title3)
@@ -1300,19 +1490,199 @@ struct RotatingLoader: View {
 struct VideoPlayerView: View {
     let url: URL
     @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
     
     var body: some View {
         NavigationView {
-            VideoPlayer(player: AVPlayer(url: url))
-                .navigationTitle("Video")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                if let errorMessage = errorMessage {
+                    VStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(.white)
+                        Text(errorMessage)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        Button("Try Again") {
+                            loadVideo()
+                        }
+                        .foregroundColor(.blue)
+                    }
+                } else if isLoading {
+                    VStack {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                        Text("Loading video...")
+                            .foregroundColor(.white)
+                            .padding(.top)
+                    }
+                } else if let player = player {
+                    VideoPlayer(player: player)
+                        .onAppear {
+                            player.play()
+                        }
+                        .onDisappear {
+                            player.pause()
+                        }
+                }
+            }
+            .navigationTitle("Video")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .overlay(
+                // Custom navigation bar overlay
+                VStack {
+                    HStack {
                         Button("Done") {
+                            player?.pause()
                             dismiss()
                         }
+                        .foregroundColor(.white)
+                        .padding(.leading)
+                        
+                        Spacer()
+                        
+                        Text("Video")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        if let player = player {
+                            Button(player.timeControlStatus == .playing ? "⏸️" : "▶️") {
+                                if player.timeControlStatus == .playing {
+                                    player.pause()
+                                } else {
+                                    player.play()
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .padding(.trailing)
+                        } else {
+                            Color.clear
+                                .frame(width: 44, height: 44)
+                                .padding(.trailing)
+                        }
                     }
+                    .frame(height: 44)
+                    .background(Color.black.opacity(0.8))
+                    Spacer()
                 }
+                .ignoresSafeArea(.all, edges: .top)
+            )
+        }
+        .onAppear {
+            loadVideo()
+        }
+    }
+    
+    private func loadVideo() {
+        isLoading = true
+        errorMessage = nil
+        
+        print("🎥 Loading video from URL: \(url)")
+        
+        // Create player with the URL
+        let newPlayer = AVPlayer(url: url)
+        
+        // Simple status check without KVO
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            switch newPlayer.status {
+            case .readyToPlay:
+                print("✅ Video ready to play")
+                self.player = newPlayer
+                self.isLoading = false
+                self.errorMessage = nil
+            case .failed:
+                print("❌ Video failed to load: \(newPlayer.error?.localizedDescription ?? "Unknown error")")
+                self.isLoading = false
+                self.errorMessage = "Failed to load video: \(newPlayer.error?.localizedDescription ?? "Unknown error")"
+            case .unknown:
+                print("🔄 Video status unknown - setting player anyway")
+                self.player = newPlayer
+                self.isLoading = false
+            @unknown default:
+                self.player = newPlayer
+                self.isLoading = false
+            }
+        }
+        
+        // Add observer for playback errors
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: newPlayer.currentItem,
+            queue: .main
+        ) { notification in
+            if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+                print("❌ Video playback error: \(error.localizedDescription)")
+                self.errorMessage = "Playback error: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+// MARK: - UIWindow Security Extension
+
+extension UIWindow {
+    func makeSecure() {
+        // Prevent screenshots and screen recording
+        let field = UITextField()
+        field.isSecureTextEntry = true
+        self.addSubview(field)
+        field.centerXAnchor.constraint(equalTo: self.centerXAnchor).isActive = true
+        field.centerYAnchor.constraint(equalTo: self.centerYAnchor).isActive = true
+        self.layer.superlayer?.addSublayer(field.layer)
+        field.layer.sublayers?.first?.addSublayer(self.layer)
+        field.isHidden = true
+    }
+}
+
+// MARK: - WhatsApp Activity
+
+class WhatsAppActivity: UIActivity {
+    private var text: String
+    
+    init(text: String) {
+        self.text = text
+        super.init()
+    }
+    
+    override var activityType: UIActivity.ActivityType? {
+        return UIActivity.ActivityType("com.silento.whatsapp")
+    }
+    
+    override var activityTitle: String? {
+        return "WhatsApp"
+    }
+    
+    override var activityImage: UIImage? {
+        return UIImage(systemName: "message.fill")
+    }
+    
+    override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
+        // Check if WhatsApp is installed
+        guard let url = URL(string: "whatsapp://send") else { return false }
+        return UIApplication.shared.canOpenURL(url)
+    }
+    
+    override func perform() {
+        let encodedText = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let whatsappURL = "whatsapp://send?text=\(encodedText)"
+        
+        if let url = URL(string: whatsappURL) {
+            UIApplication.shared.open(url) { success in
+                DispatchQueue.main.async {
+                    self.activityDidFinish(success)
+                }
+            }
+        } else {
+            activityDidFinish(false)
         }
     }
 }
