@@ -11,7 +11,7 @@ interface WebSocketMessage {
   message?: string;
   content?: string;  // Add content field for iOS app compatibility
   messageType?: string;  // Add messageType field
-  mediaURL?: string;  // Add mediaURL field
+  mediaURL?: string;  // Add mediaURL field (used as mediaId for P2P)
   fileName?: string;  // Add fileName field (already exists but different purpose)
   timestamp?: number;
   transferId?: string;
@@ -21,6 +21,8 @@ interface WebSocketMessage {
   chunkIndex?: number;
   totalChunks?: number;
   chunkData?: string;
+  // P2P Media Transfer fields
+  mediaId?: string;  // Unique identifier for media transfer
 }
 
 function handleChatMessage(message: WebSocketMessage, roomManager: RoomManager, currentRoomId: string) {
@@ -120,6 +122,17 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
             }
             break;
           
+          // P2P Media Transfer Support - Simply relay messages without storing data
+          case 'media_start':
+          case 'media_chunk':
+          case 'media_end':
+            if (currentRoomId && currentClientId) {
+              // Simply relay the P2P media messages to other peers without processing
+              console.log(`📡 Relaying P2P media message: ${message.type} from ${currentClientId}`);
+              roomManager.broadcastToRoom(currentRoomId, message, currentClientId);
+            }
+            break;
+          
           case 'offer':
           case 'answer':
           case 'ice-candidate':
@@ -209,8 +222,6 @@ export function setupWebSocketHandler(wss: WebSocketServer, roomManager: RoomMan
 
       console.log(`Client ${clientId} joined room ${roomId}`);
     }
-
-
 
     function handleSignaling(message: WebSocketMessage, roomManager: RoomManager) {
       const { from, to, payload, type } = message;
