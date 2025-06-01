@@ -23,6 +23,7 @@ struct ChatRoomView: View {
     @State private var isRecordingVideo = false
     @State private var audioRecorder: AVAudioRecorder?
     @State private var audioPlayer: AVAudioPlayer?
+    @State private var audioSession = AVAudioSession.sharedInstance()
     @State private var recordingTimer: Timer?
     @State private var recordingDuration: TimeInterval = 0
     @State private var currentlyPlayingAudioURL: String?
@@ -31,123 +32,115 @@ struct ChatRoomView: View {
     @State private var videoPlayerURL: URL?
     @FocusState private var isMessageFieldFocused: Bool
     @State private var uploadingMessages: Set<String> = []
-    @State private var lastInputHeight: CGFloat = 100
-    @State private var keyboardHeight: CGFloat = 0
-    @State private var showingInfoSheet = false
-    @State private var showingInformationDialog = false
-    @State private var showingLeaveConfirmation = false
-    @State private var flashOpacity: Double = 0.0
+    @State private var isScreenshotProtectionEnabled = false
     
-    // Audio recording
-    private let audioSession = AVAudioSession.sharedInstance()
-
     var body: some View {
-        ZStack {
-            // Main content
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    Button(action: { showLeaveAlert = true }) {
-                        Image(systemName: "arrow.left")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: { showRoomInfo = true }) {
-                        VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Text("Room \(roomId)")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                
-                                Circle()
-                                    .fill(chatService.isConnected ? .green : .red)
-                                    .frame(width: 8, height: 8)
-                            }
+        let mainContent = VStack(spacing: 0) {
+            // Header
+            HStack {
+                Button(action: { showLeaveAlert = true }) {
+                    Image(systemName: "arrow.left")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                Button(action: { showRoomInfo = true }) {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text("Room \(roomId)")
+                                .font(.headline)
+                                .foregroundColor(.white)
                             
-                            if chatService.peers.isEmpty {
-                                Text("You're alone")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
-                            } else {
-                                Text("\(chatService.peers.count) other\(chatService.peers.count == 1 ? "" : "s")")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
-                            }
+                            Circle()
+                                .fill(chatService.isConnected ? .green : .red)
+                                .frame(width: 8, height: 8)
                         }
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: { showRoomInfo = true }) {
-                        Image(systemName: "info.circle")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-                    
-                    Button(action: { shareRoom() }) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.black.opacity(0.8))
-                
-                // Messages
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(chatService.messages) { message in
-                                MessageBubbleView(
-                                    message: message,
-                                    isCurrentUser: message.isFromCurrentUser,
-                                    currentlyPlayingURL: $currentlyPlayingAudioURL,
-                                    onPlayAudio: playAudioMessage,
-                                    onStopAudio: stopAudioPlayback,
-                                    isUploading: uploadingMessages.contains(message.id),
-                                    showVideoPlayer: $showVideoPlayer,
-                                    videoPlayerURL: $videoPlayerURL,
-                                    onDownloadFile: downloadFile
-                                )
-                                    .id(message.id)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                    }
-                    .onChange(of: chatService.messages.count) { _ in
-                        if let lastMessage = chatService.messages.last {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
+                        
+                        if chatService.peers.isEmpty {
+                            Text("You're alone")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                        } else {
+                            Text("\(chatService.peers.count) other\(chatService.peers.count == 1 ? "" : "s")")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
                         }
                     }
                 }
                 
-                // Message input
-                ModernMessageInputView(
-                    messageText: $messageText,
-                    isMessageFieldFocused: $isMessageFieldFocused,
-                    onSend: sendMessage,
-                    onAttachmentTap: showAttachmentOptions,
-                    onCameraTap: {
-                        // Always open camera directly for photos - ensure source type is set correctly
-                        imagePickerSourceType = .camera
-                        showImagePicker = true
-                    },
-                    onCameraLongPress: {
-                        // Long press for video recording
-                        startVideoRecording()
-                    },
-                    onVoiceTap: toggleAudioRecording,
-                    isRecording: isRecordingAudio
-                )
+                Spacer()
+                
+                Button(action: { showRoomInfo = true }) {
+                    Image(systemName: "info.circle")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                
+                Button(action: { shareRoom() }) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.black.opacity(0.8))
+            
+            // Messages
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(chatService.messages) { message in
+                            MessageBubbleView(
+                                message: message,
+                                isCurrentUser: message.isFromCurrentUser,
+                                currentlyPlayingURL: $currentlyPlayingAudioURL,
+                                onPlayAudio: playAudioMessage,
+                                onStopAudio: stopAudioPlayback,
+                                isUploading: uploadingMessages.contains(message.id),
+                                showVideoPlayer: $showVideoPlayer,
+                                videoPlayerURL: $videoPlayerURL,
+                                onDownloadFile: downloadFile
+                            )
+                                .id(message.id)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .onChange(of: chatService.messages.count) { _ in
+                    if let lastMessage = chatService.messages.last {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+            
+            // Message input
+            ModernMessageInputView(
+                messageText: $messageText,
+                isMessageFieldFocused: $isMessageFieldFocused,
+                onSend: sendMessage,
+                onAttachmentTap: showAttachmentOptions,
+                onCameraTap: {
+                    // Always open camera directly for photos - ensure source type is set correctly
+                    imagePickerSourceType = .camera
+                    showImagePicker = true
+                },
+                onCameraLongPress: {
+                    // Long press for video recording
+                    startVideoRecording()
+                },
+                onVoiceTap: toggleAudioRecording,
+                isRecording: isRecordingAudio
+            )
         }
+        
+        mainContent
+        .screenshotProtected(isProtected: isScreenshotProtectionEnabled)
         .background(Color.black)
         .sheet(isPresented: $showRoomInfo) {
             RoomInfoView(
@@ -215,6 +208,12 @@ struct ChatRoomView: View {
         .onTapGesture {
             isMessageFieldFocused = false
         }
+        .onAppear {
+            enableScreenshotProtection()
+        }
+        .onDisappear {
+            disableScreenshotProtection()
+        }
     }
     
     private func addSystemMessage(_ content: String) {
@@ -236,8 +235,14 @@ struct ChatRoomView: View {
     
     private func sendMessage() {
         let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedMessage.isEmpty else { return }
+        print("📤 Send message called with text: '\(messageText)' (trimmed: '\(trimmedMessage)')")
         
+        guard !trimmedMessage.isEmpty else { 
+            print("❌ Cannot send empty message")
+            return 
+        }
+        
+        print("✅ Sending message: '\(trimmedMessage)'")
         chatService.sendMessage(trimmedMessage)
         messageText = ""
         isMessageFieldFocused = false
@@ -317,7 +322,7 @@ struct ChatRoomView: View {
             let uploadingMessageId = UUID().uuidString
             let uploadingMessage = ChatMessage(
                 id: uploadingMessageId,
-                content: "🎤 Uploading voice message...",
+                content: "🎤 Sending voice message...",
                 type: .audio,
                 isFromCurrentUser: true,
                 timestamp: Date(),
@@ -330,8 +335,8 @@ struct ChatRoomView: View {
                 self.uploadingMessages.insert(uploadingMessageId)
             }
             
-            // Upload to server with correct mime type
-            chatService.uploadFile(audioData, fileName: fileName, mimeType: "audio/m4a") { result in
+            // Send audio data directly via P2P chunks instead of uploading to server
+            chatService.sendMediaDataDirectly(audioData, fileName: fileName, mimeType: "audio/m4a") { result in
                 DispatchQueue.main.async {
                     // Remove uploading placeholder
                     self.uploadingMessages.remove(uploadingMessageId)
@@ -340,13 +345,13 @@ struct ChatRoomView: View {
                     }
                     
                     switch result {
-                    case .success(let fileURL):
-                        print("✅ Voice message uploaded: \(fileURL)")
-                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "audio/m4a")
+                    case .success(let localURL):
+                        print("✅ Voice message sent via P2P: \(localURL)")
+                        self.chatService.sendMediaMessage(fileURL: localURL, fileName: fileName, mimeType: "audio/m4a")
                         
                     case .failure(let error):
-                        print("❌ Failed to upload voice message: \(error)")
-                        self.chatService.sendMessage("❌ Failed to upload voice message")
+                        print("❌ Failed to send voice message via P2P: \(error)")
+                        self.chatService.sendMessage("❌ Failed to send voice message")
                     }
                 }
             }
@@ -375,12 +380,13 @@ struct ChatRoomView: View {
         }
         
         let fileName = "image_\(Date().timeIntervalSince1970).jpg"
+        print("📊 Image size: \(imageData.count) bytes")
         
         // Create uploading placeholder message with loading indicator
         let uploadingMessageId = UUID().uuidString
         let uploadingMessage = ChatMessage(
             id: uploadingMessageId,
-            content: "📸 Uploading image...",
+            content: "📸 Sending image...",
             type: .text,
             isFromCurrentUser: true,
             timestamp: Date(),
@@ -393,8 +399,8 @@ struct ChatRoomView: View {
             self.uploadingMessages.insert(uploadingMessageId)
         }
         
-        // Upload file to server
-        chatService.uploadFile(imageData, fileName: fileName, mimeType: "image/jpeg") { result in
+        // Send image data directly via P2P chunks instead of uploading to server
+        chatService.sendMediaDataDirectly(imageData, fileName: fileName, mimeType: "image/jpeg") { result in
             DispatchQueue.main.async {
                 // Remove uploading placeholder
                 self.uploadingMessages.remove(uploadingMessageId)
@@ -403,15 +409,15 @@ struct ChatRoomView: View {
                 }
                 
                 switch result {
-                case .success(let fileURL):
-                    print("✅ Image uploaded successfully: \(fileURL)")
-                    // Send actual media message
-                    self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "image/jpeg")
+                case .success(let localURL):
+                    print("✅ Image sent via P2P: \(localURL)")
+                    // Send actual media message with local file reference
+                    self.chatService.sendMediaMessage(fileURL: localURL, fileName: fileName, mimeType: "image/jpeg")
                     
                 case .failure(let error):
-                    print("❌ Failed to upload image: \(error)")
+                    print("❌ Failed to send image via P2P: \(error)")
                     // Send error message
-                    self.chatService.sendMessage("❌ Failed to upload image: \(error.localizedDescription)")
+                    self.chatService.sendMessage("❌ Failed to send image: \(error.localizedDescription)")
                 }
             }
         }
@@ -741,11 +747,13 @@ struct ChatRoomView: View {
             let videoData = try Data(contentsOf: videoURL)
             let fileName = "video_\(Date().timeIntervalSince1970).mp4"
             
-            // Create uploading placeholder message with loading indicator
+            print("📊 Video size: \(videoData.count) bytes")
+            
+            // Create uploading placeholder message
             let uploadingMessageId = UUID().uuidString
             let uploadingMessage = ChatMessage(
                 id: uploadingMessageId,
-                content: "🎥 Uploading video...",
+                content: "🎥 Sending video...",
                 type: .video,
                 isFromCurrentUser: true,
                 timestamp: Date(),
@@ -758,8 +766,8 @@ struct ChatRoomView: View {
                 self.uploadingMessages.insert(uploadingMessageId)
             }
             
-            // Upload file to server
-            chatService.uploadFile(videoData, fileName: fileName, mimeType: "video/mp4") { result in
+            // Send video data directly via P2P chunks instead of uploading to server
+            chatService.sendMediaDataDirectly(videoData, fileName: fileName, mimeType: "video/mp4") { result in
                 DispatchQueue.main.async {
                     // Remove uploading placeholder
                     self.uploadingMessages.remove(uploadingMessageId)
@@ -768,15 +776,15 @@ struct ChatRoomView: View {
                     }
                     
                     switch result {
-                    case .success(let fileURL):
-                        print("✅ Video uploaded successfully: \(fileURL)")
-                        // Send actual media message
-                        self.chatService.sendMediaMessage(fileURL: fileURL, fileName: fileName, mimeType: "video/mp4")
+                    case .success(let localURL):
+                        print("✅ Video sent via P2P: \(localURL)")
+                        // Send actual media message with local file reference
+                        self.chatService.sendMediaMessage(fileURL: localURL, fileName: fileName, mimeType: "video/mp4")
                         
                     case .failure(let error):
-                        print("❌ Failed to upload video: \(error)")
+                        print("❌ Failed to send video via P2P: \(error)")
                         // Send error message
-                        self.chatService.sendMessage("❌ Failed to upload video: \(error.localizedDescription)")
+                        self.chatService.sendMessage("❌ Failed to send video: \(error.localizedDescription)")
                     }
                 }
             }
@@ -785,6 +793,18 @@ struct ChatRoomView: View {
             print("❌ Failed to read video file: \(error)")
             chatService.sendMessage("❌ Failed to read video file: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - Screenshot Protection
+    
+    private func enableScreenshotProtection() {
+        isScreenshotProtectionEnabled = true
+        print("🔒 Screenshot protection enabled")
+    }
+    
+    private func disableScreenshotProtection() {
+        isScreenshotProtectionEnabled = false
+        print("🔓 Screenshot protection disabled")
     }
 }
 
@@ -1030,10 +1050,35 @@ struct MessageBubbleView: View {
                                     }
                                 } else {
                                     Button(action: {
+                                        print("🎥 Video play button tapped")
+                                        print("🎥 Message type: \(message.type)")
+                                        print("🎥 Message mediaURL: \(message.mediaURL ?? "nil")")
+                                        print("🎥 Message content: \(message.content)")
+                                        print("🎥 Message fileName: \(message.fileName ?? "nil")")
+                                        print("🎥 Is uploading: \(isUploading)")
+                                        
                                         if let mediaURL = message.mediaURL, let url = URL(string: mediaURL) {
+                                            print("🎥 Valid URL created: \(url)")
+                                            print("🎥 URL scheme: \(url.scheme ?? "none")")
+                                            print("🎥 URL host: \(url.host ?? "none")")
+                                            print("🎥 URL port: \(url.port?.description ?? "none")")
+                                            print("🎥 URL path: \(url.path)")
+                                            print("🎥 Full URL: \(url.absoluteString)")
+                                            
+                                            // Test if URL is reachable before opening video player
+                                            print("🎥 Testing URL reachability...")
+                                            
                                             // Set the video URL and show player
                                             videoPlayerURL = url
                                             showVideoPlayer = true
+                                        } else {
+                                            print("❌ No valid video URL found")
+                                            print("❌ Raw mediaURL: \(message.mediaURL ?? "nil")")
+                                            print("❌ URL creation failed for: \(message.mediaURL ?? "nil")")
+                                            
+                                            // Show error message to user
+                                            let errorMessage = "Video URL is invalid or missing. This may happen if:\n• The video upload failed\n• The server URL is malformed\n• The video was deleted from server"
+                                            print("❌ Error: \(errorMessage)")
                                         }
                                     }) {
                                         VStack {
@@ -1045,6 +1090,7 @@ struct MessageBubbleView: View {
                                                 .foregroundColor(.white.opacity(0.8))
                                         }
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                         )
@@ -1217,13 +1263,18 @@ struct ModernMessageInputView: View {
         HStack(spacing: 8) {
             // Attachment button
             if !hasText {
-                Button(action: onAttachmentTap) {
+                Button(action: {
+                    // Ensure immediate response to tap
+                    print("📎 Attachment button tapped")
+                    onAttachmentTap()
+                }) {
                     Image(systemName: "plus")
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.7))
                         .frame(width: 32, height: 32)
                         .background(Circle().fill(Color.white.opacity(0.1)))
                 }
+                .buttonStyle(PlainButtonStyle()) // Remove default button styling that might cause delays
                 .transition(.scale.combined(with: .opacity))
             }
             
@@ -1238,6 +1289,7 @@ struct ModernMessageInputView: View {
                     .submitLabel(.send)
                     .onSubmit {
                         if hasText {
+                            print("📤 Send via keyboard submit")
                             onSend()
                         }
                     }
@@ -1246,6 +1298,7 @@ struct ModernMessageInputView: View {
                 if !hasText {
                     Button(action: {
                         // Short tap - take photo with camera
+                        print("📸 Camera button tapped")
                         onCameraTap()
                     }) {
                         Image(systemName: "camera.fill")
@@ -1255,10 +1308,15 @@ struct ModernMessageInputView: View {
                             .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
-                    .onLongPressGesture(minimumDuration: 0.5) {
-                        // Long press - record video
-                        onCameraLongPress()
-                    }
+                    .buttonStyle(PlainButtonStyle()) // Remove default button styling
+                    .simultaneousGesture(
+                        // Add long press gesture separately to avoid conflicts
+                        LongPressGesture(minimumDuration: 0.5)
+                            .onEnded { _ in
+                                print("🎥 Camera long press for video")
+                                onCameraLongPress()
+                            }
+                    )
                 }
             }
             .padding(.horizontal, 16)
@@ -1273,7 +1331,15 @@ struct ModernMessageInputView: View {
             )
             
             // Send/Voice button
-            Button(action: hasText ? onSend : onVoiceTap) {
+            Button(action: {
+                if hasText {
+                    print("📤 Send button tapped")
+                    onSend()
+                } else {
+                    print("🎤 Voice button tapped")
+                    onVoiceTap()
+                }
+            }) {
                 Image(systemName: hasText ? "paperplane.fill" : (isRecording ? "stop.circle.fill" : "mic.fill"))
                     .font(.title3)
                     .foregroundColor(.white)
@@ -1297,6 +1363,7 @@ struct ModernMessageInputView: View {
                     .scaleEffect(isRecording ? 1.1 : 1.0)
                     .animation(.easeInOut(duration: 0.2), value: isRecording)
             }
+            .buttonStyle(PlainButtonStyle()) // Remove default button styling
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -1514,10 +1581,9 @@ struct RotatingLoader: View {
 struct VideoPlayerView: View {
     let url: URL
     @Environment(\.dismiss) private var dismiss
-    @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var playerObserver: Any?
+    @State private var hasValidated = false
     
     var body: some View {
         NavigationView {
@@ -1529,18 +1595,35 @@ struct VideoPlayerView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundColor(.white)
-                        Text(errorMessage)
+                        
+                        Text("Video Playback Error")
+                            .font(.headline)
                             .foregroundColor(.white)
+                        
+                        Text(errorMessage)
+                            .foregroundColor(.white.opacity(0.8))
                             .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        VStack(spacing: 12) {
+                            Button("Try Again") {
+                                validateAndPlay()
+                            }
                             .padding()
-                        Button("Try Again") {
-                            loadVideo()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                            
+                            Button("Open in Browser") {
+                                openInBrowser()
+                            }
+                            .padding()
+                            .background(Color.gray)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
                     }
+                    .padding()
                 } else if isLoading {
                     VStack(spacing: 16) {
                         ProgressView()
@@ -1549,146 +1632,194 @@ struct VideoPlayerView: View {
                         Text("Loading video...")
                             .foregroundColor(.white)
                             .font(.headline)
+                        Text(url.absoluteString)
+                            .foregroundColor(.white.opacity(0.6))
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
-                } else if let player = player {
-                    VideoPlayer(player: player)
-                        .onAppear {
-                            player.play()
-                        }
-                        .onDisappear {
-                            player.pause()
-                        }
+                } else {
+                    VideoPlayerController(url: url)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Video")
             .navigationBarBackButtonHidden(true)
-            .overlay(
-                VStack {
-                    HStack {
-                        Button("Done") {
-                            player?.pause()
-                            dismiss()
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.leading)
-                        
-                        Spacer()
-                        
-                        Text("Video Player")
-                            .foregroundColor(.white)
-                            .font(.headline)
-                        
-                        Spacer()
-                        
-                        if let player = player {
-                            Button(action: {
-                                if player.timeControlStatus == .playing {
-                                    player.pause()
-                                } else {
-                                    player.play()
-                                }
-                            }) {
-                                Image(systemName: player.timeControlStatus == .playing ? "pause.fill" : "play.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                            }
-                            .padding(.trailing)
-                        } else {
-                            Color.clear
-                                .frame(width: 44, height: 44)
-                                .padding(.trailing)
-                        }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        dismiss()
                     }
-                    .frame(height: 44)
-                    .background(Color.black.opacity(0.8))
-                    
-                    Spacer()
+                    .foregroundColor(.white)
                 }
-                .ignoresSafeArea(.all, edges: .top)
-            )
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Info") {
+                        showVideoInfo()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
         }
         .onAppear {
-            loadVideo()
+            validateAndPlay()
         }
-        .onDisappear {
-            if let observer = playerObserver {
-                NotificationCenter.default.removeObserver(observer)
+    }
+    
+    private func validateAndPlay() {
+        guard !hasValidated else { return }
+        hasValidated = true
+        
+        print("🎥 Validating video URL: \(url.absoluteString)")
+        print("🎥 URL scheme: \(url.scheme ?? "none")")
+        print("🎥 URL host: \(url.host ?? "none")")
+        print("🎥 URL path: \(url.path)")
+        
+        isLoading = true
+        errorMessage = nil
+        
+        // Handle local file URLs from P2P system
+        if url.scheme == "file" {
+            print("🎥 Local file detected, checking if file exists")
+            
+            if FileManager.default.fileExists(atPath: url.path) {
+                print("✅ Local video file exists")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = nil
+                }
+            } else {
+                print("❌ Local video file not found: \(url.path)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = "Video file not found. The file may have been deleted or the chat session ended."
+                }
+            }
+            return
+        }
+        
+        // For remote URLs, validate accessibility
+        guard url.scheme == "http" || url.scheme == "https" else {
+            print("❌ Invalid URL scheme: \(url.scheme ?? "none")")
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.errorMessage = "Invalid video URL format"
+            }
+            return
+        }
+        
+        // Validate remote URL accessibility
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(from: url)
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("🎥 Video URL response status: \(httpResponse.statusCode)")
+                    print("🎥 Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
+                    print("🎥 Content-Length: \(httpResponse.value(forHTTPHeaderField: "Content-Length") ?? "unknown")")
+                    
+                    DispatchQueue.main.async {
+                        if httpResponse.statusCode == 200 {
+                            self.isLoading = false
+                            self.errorMessage = nil
+                        } else {
+                            self.isLoading = false
+                            self.errorMessage = "Server returned error \(httpResponse.statusCode). The video may have been deleted or is temporarily unavailable."
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.errorMessage = "Invalid server response"
+                    }
+                }
+            } catch {
+                print("❌ Video URL validation failed: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = "Cannot access video: \(error.localizedDescription)\n\nThis may be due to:\n• Network connection issues\n• Server temporary unavailability\n• Video file was deleted"
+                }
             }
         }
     }
     
-    private func loadVideo() {
-        isLoading = true
-        errorMessage = nil
+    private func openInBrowser() {
+        UIApplication.shared.open(url)
+    }
+    
+    private func showVideoInfo() {
+        let alert = UIAlertController(
+            title: "Video Information",
+            message: "URL: \(url.absoluteString)\n\nScheme: \(url.scheme ?? "none")\nHost: \(url.host ?? "none")\nPath: \(url.path)",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "Copy URL", style: .default) { _ in
+            UIPasteboard.general.string = url.absoluteString
+        })
         
-        print("🎥 Loading video from URL: \(url)")
-        
-        // Create player item directly with better error handling
-        let playerItem = AVPlayerItem(url: url)
-        let newPlayer = AVPlayer(playerItem: playerItem)
-        
-        // Configure player for better performance
-        newPlayer.automaticallyWaitsToMinimizeStalling = false
-        
-        // Add observer for player item status changes
-        let statusObserver = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
-            DispatchQueue.main.async {
-                switch item.status {
-                case .readyToPlay:
-                    print("✅ Video ready to play")
-                    self.player = newPlayer
-                    self.isLoading = false
-                    self.errorMessage = nil
-                case .failed:
-                    let errorDescription = item.error?.localizedDescription ?? "Unknown playback error"
-                    print("❌ Video failed to load: \(errorDescription)")
-                    self.isLoading = false
-                    self.errorMessage = "Failed to load video: \(errorDescription)"
-                case .unknown:
-                    print("🔄 Video status unknown")
-                @unknown default:
-                    print("🔄 Video status unknown default")
-                }
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            var rootViewController = window.rootViewController
+            while let presentedViewController = rootViewController?.presentedViewController {
+                rootViewController = presentedViewController
             }
+            rootViewController?.present(alert, animated: true)
         }
+    }
+}
+
+struct VideoPlayerController: UIViewControllerRepresentable {
+    let url: URL
+    
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
         
-        // Store the observer
-        playerObserver = statusObserver
+        print("🎥 Creating AVPlayerViewController for URL: \(url)")
         
-        // Add observer for player item end
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: playerItem,
-            queue: .main
-        ) { _ in
-            // Video finished playing - restart
-            newPlayer.seek(to: .zero)
-        }
+        // Create player with URL
+        let player = AVPlayer(url: url)
+        controller.player = player
         
-        // Add observer for failed playback
+        // Configure controller
+        controller.showsPlaybackControls = true
+        controller.allowsPictureInPicturePlayback = true
+        controller.videoGravity = .resizeAspect
+        
+        // Add error handling
         NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
-            object: playerItem,
+            object: player.currentItem,
             queue: .main
         ) { notification in
             if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
-                print("❌ Video playback error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.errorMessage = "Playback failed: \(error.localizedDescription)"
-                    self.isLoading = false
-                }
+                print("❌ AVPlayer failed to play: \(error.localizedDescription)")
             }
         }
         
-        // Timeout fallback - if loading takes too long, show error
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-            if self.isLoading {
-                print("⏰ Video loading timeout")
-                self.errorMessage = "Video loading timeout. Please check your connection."
-                self.isLoading = false
-            }
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        // Ensure player is set and ready
+        if uiViewController.player == nil {
+            print("🎥 Setting up player in updateUIViewController")
+            let player = AVPlayer(url: url)
+            uiViewController.player = player
         }
+        
+        // Start playback when ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            print("🎥 Starting video playback")
+            uiViewController.player?.play()
+        }
+    }
+    
+    static func dismantleUIViewController(_ uiViewController: AVPlayerViewController, coordinator: ()) {
+        print("🎥 Dismantling AVPlayerViewController")
+        uiViewController.player?.pause()
+        uiViewController.player = nil
+        NotificationCenter.default.removeObserver(uiViewController)
     }
 }
 

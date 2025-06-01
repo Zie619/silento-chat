@@ -360,7 +360,25 @@ class ChatService: ObservableObject {
         ]
         
         print("📡 Sending WebSocket init message for room: \(roomId)")
-        try await sendWebSocketMessage(initMessage)
+        Task {
+            do {
+                try await sendWebSocketMessageAsync(WebSocketMessage(
+                    type: "init",
+                    content: nil,
+                    clientId: _clientId,
+                    roomId: roomId,
+                    messageType: nil,
+                    mediaURL: nil,
+                    fileName: nil,
+                    fileSize: nil
+                ))
+            } catch {
+                print("❌ Failed to send init message: \(error)")
+                DispatchQueue.main.async {
+                    self.connectionStatus = .failed
+                }
+            }
+        }
         
         // Don't set connection status here - wait for init-success response
         print("✅ WebSocket init message sent, waiting for server response...")
@@ -551,7 +569,16 @@ class ChatService: ObservableObject {
         )
         
         print("📡 Sending WebSocket init message for room: \(roomId)")
-        sendWebSocketMessage(initMessage)
+        Task {
+            do {
+                try await sendWebSocketMessageAsync(initMessage)
+            } catch {
+                print("❌ Failed to send init message: \(error)")
+                DispatchQueue.main.async {
+                    self.connectionStatus = .failed
+                }
+            }
+        }
         startListening()
         
         await MainActor.run {
@@ -645,6 +672,17 @@ class ChatService: ObservableObject {
                         self.peers = connectedUsers.filter { $0 != self._clientId }
                     }
                     
+                case "media_start":
+                    self.handleMediaStart(json)
+                    
+                case "media_chunk":
+                    if let messageData = text.data(using: .utf8) {
+                        self.handleMediaChunk(messageData)
+                    }
+                    
+                case "media_end":
+                    print("✅ Media transfer completed")
+                    
                 default:
                     print("❓ Unknown message type: \(type)")
                     break
@@ -665,13 +703,18 @@ class ChatService: ObservableObject {
         return formatter.date(from: dateString)
     }
     
-    private func sendWebSocketMessage(_ message: WebSocketMessage) {
-        guard let data = try? JSONEncoder().encode(message),
-              let text = String(data: data, encoding: .utf8) else { return }
+    private func sendWebSocketMessageAsync(_ message: WebSocketMessage) async throws {
+        let encoder = JSONEncoder()
+        let messageData = try encoder.encode(message)
+        let messageText = String(data: messageData, encoding: .utf8) ?? ""
         
-        webSocketTask?.send(.string(text)) { error in
-            if let error = error {
-                print("Failed to send message: \(error)")
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            webSocketTask?.send(.string(messageText)) { error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
             }
         }
     }
@@ -723,22 +766,19 @@ class ChatService: ObservableObject {
         print("👥 Current peers: \(peers)")
         print("🏠 Room ID: \(roomId)")
         
-        do {
-            // Don't encrypt messages for now to fix cross-user communication
-            // TODO: Implement proper shared encryption key
-            let messageContent = message.content
+        do {            
+            let webSocketMessage = WebSocketMessage(
+                type: "message",
+                content: message.content,
+                clientId: _clientId,
+                roomId: roomId,
+                messageType: message.type.rawValue,
+                mediaURL: message.mediaURL,
+                fileName: message.fileName,
+                fileSize: message.fileSize
+            )
             
-            let webSocketMessage: [String: Any] = [
-                "type": "message",
-                "messageType": message.type.rawValue,
-                "content": messageContent,
-                "mediaURL": message.mediaURL ?? "",
-                "fileName": message.fileName ?? "",
-                "clientId": _clientId,
-                "roomId": roomId  // Add room ID so server knows where to route
-            ]
-            
-            try await sendWebSocketMessage(webSocketMessage)
+            try await sendWebSocketMessageAsync(webSocketMessage)
             
             await MainActor.run {
                 updateMessageStatus(messageId: message.id, status: .sent)
@@ -773,13 +813,15 @@ class ChatService: ObservableObject {
         return String(data: decryptedData, encoding: .utf8) ?? encryptedContent
     }
     
-    private func sendWebSocketMessage(_ message: [String: Any]) async throws {
-        let data = try JSONSerialization.data(withJSONObject: message)
-        let text = String(data: data, encoding: .utf8)!
+    private func sendWebSocketMessage(_ message: WebSocketMessage) {
+        guard let data = try? JSONEncoder().encode(message),
+              let text = String(data: data, encoding: .utf8) else { return }
         
-        print("📡 Sending WebSocket message: \(message)")
-        
-        try await webSocketTask?.send(.string(text))
+        webSocketTask?.send(.string(text)) { error in
+            if let error = error {
+                print("Failed to send message: \(error)")
+            }
+        }
     }
     
     private func listenForMessages() {
@@ -1076,20 +1118,19 @@ class ChatService: ObservableObject {
     private func sendInitMessage(roomId: String) {
         print("📡 Sending WebSocket init message for room: \(roomId)")
         
-        let initMessage = WebSocketMessage(
-            type: "init",
-            clientId: _clientId,
-            roomId: roomId
-        )
-        
-        guard let data = try? JSONEncoder().encode(initMessage),
-              let text = String(data: data, encoding: .utf8) else {
-            print("❌ Failed to encode init message")
-            return
-        }
-        
-        webSocketTask?.send(.string(text)) { error in
-            if let error = error {
+        Task {
+            do {
+                try await sendWebSocketMessageAsync(WebSocketMessage(
+                    type: "init",
+                    content: nil,
+                    clientId: _clientId,
+                    roomId: roomId,
+                    messageType: nil,
+                    mediaURL: nil,
+                    fileName: nil,
+                    fileSize: nil
+                ))
+            } catch {
                 print("❌ Failed to send init message: \(error)")
                 DispatchQueue.main.async {
                     self.connectionStatus = .failed
@@ -1107,7 +1148,291 @@ class ChatService: ObservableObject {
         messages.removeAll()
         currentRoomId = nil
         currentServerURL = nil
+        
+        // Clean up temporary media files
+        cleanupTempMediaFiles()
+        
         print("🔌 Left room and disconnected")
+    }
+    
+    // MARK: - P2P Media Transfer
+    
+    func sendMediaDataDirectly(_ data: Data, fileName: String, mimeType: String, completion: @escaping (Result<String, Error>) -> Void) {
+        Task {
+            do {
+                let localURL = try await sendMediaViaPeerToPeer(data: data, fileName: fileName, mimeType: mimeType)
+                completion(.success(localURL))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    private func sendMediaViaPeerToPeer(data: Data, fileName: String, mimeType: String) async throws -> String {
+        print("📡 Starting P2P media transfer for \(fileName) (\(data.count) bytes)")
+        
+        // Store file locally for sending
+        let localURL = try saveMediaFileLocally(data: data, fileName: fileName)
+        
+        // Send media chunks via WebSocket
+        try await sendMediaChunks(data: data, fileName: fileName, mimeType: mimeType)
+        
+        return localURL
+    }
+    
+    private func saveMediaFileLocally(data: Data, fileName: String) throws -> String {
+        let tempDir = createTempMediaDirectory()
+        let fileURL = tempDir.appendingPathComponent(fileName)
+        
+        try data.write(to: fileURL)
+        print("💾 Saved media file locally: \(fileURL.path)")
+        
+        return fileURL.absoluteString
+    }
+    
+    private func createTempMediaDirectory() -> URL {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("SilentoMedia")
+        
+        if !FileManager.default.fileExists(atPath: tempDir.path) {
+            try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            print("📁 Created temp media directory: \(tempDir.path)")
+        }
+        
+        return tempDir
+    }
+    
+    private func sendMediaChunks(data: Data, fileName: String, mimeType: String) async throws {
+        let chunkSize = 64 * 1024 // 64KB chunks
+        let totalChunks = (data.count + chunkSize - 1) / chunkSize
+        let mediaId = UUID().uuidString
+        
+        print("📦 Sending \(totalChunks) chunks for \(fileName)")
+        
+        // Send media start message
+        let startMessage = WebSocketMessage(
+            type: "media_start",
+            content: nil,
+            clientId: _clientId,
+            roomId: currentRoomId,
+            messageType: mimeType,
+            mediaURL: mediaId,
+            fileName: fileName,
+            fileSize: data.count
+        )
+        
+        try await sendWebSocketMessageAsync(startMessage)
+        
+        // Send chunks
+        for chunkIndex in 0..<totalChunks {
+            let startIndex = chunkIndex * chunkSize
+            let endIndex = min(startIndex + chunkSize, data.count)
+            let chunkData = data.subdata(in: startIndex..<endIndex)
+            
+            let chunkMessage = MediaChunkMessage(
+                type: "media_chunk",
+                clientId: _clientId,
+                roomId: currentRoomId ?? "",
+                mediaId: mediaId,
+                chunkIndex: chunkIndex,
+                totalChunks: totalChunks,
+                chunkData: chunkData.base64EncodedString()
+            )
+            
+            let encoder = JSONEncoder()
+            let messageData = try encoder.encode(chunkMessage)
+            let messageText = String(data: messageData, encoding: .utf8) ?? ""
+            
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                webSocketTask?.send(.string(messageText)) { error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
+            
+            print("📤 Sent chunk \(chunkIndex + 1)/\(totalChunks)")
+            
+            // Small delay to prevent overwhelming the connection
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        }
+        
+        // Send media end message
+        let endMessage = WebSocketMessage(
+            type: "media_end",
+            content: nil,
+            clientId: _clientId,
+            roomId: currentRoomId,
+            messageType: mimeType,
+            mediaURL: mediaId,
+            fileName: fileName,
+            fileSize: data.count
+        )
+        
+        try await sendWebSocketMessageAsync(endMessage)
+        print("✅ Completed P2P media transfer for \(fileName)")
+    }
+    
+    private func sendWebSocketMessage(_ message: WebSocketMessage) async throws {
+        let encoder = JSONEncoder()
+        let messageData = try encoder.encode(message)
+        let messageText = String(data: messageData, encoding: .utf8) ?? ""
+        
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            webSocketTask?.send(.string(messageText)) { error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Receiving Media Chunks
+    
+    private var receivingMedia: [String: MediaReceiveState] = [:]
+    
+    private struct MediaReceiveState {
+        let fileName: String
+        let mimeType: String
+        let totalSize: Int
+        let totalChunks: Int
+        var receivedChunks: [Int: Data] = [:]
+        var receivedChunkCount: Int = 0
+        
+        var isComplete: Bool {
+            return receivedChunkCount == totalChunks
+        }
+    }
+    
+    private func handleMediaStart(_ message: [String: Any]) {
+        guard let mediaId = message["mediaURL"] as? String,
+              let fileName = message["fileName"] as? String,
+              let mimeType = message["messageType"] as? String,
+              let fileSize = message["fileSize"] as? Int else {
+            print("❌ Invalid media start message")
+            return
+        }
+        
+        // Calculate total chunks
+        let chunkSize = 64 * 1024
+        let totalChunks = (fileSize + chunkSize - 1) / chunkSize
+        
+        receivingMedia[mediaId] = MediaReceiveState(
+            fileName: fileName,
+            mimeType: mimeType,
+            totalSize: fileSize,
+            totalChunks: totalChunks
+        )
+        
+        print("🔄 Started receiving media: \(fileName) (\(fileSize) bytes, \(totalChunks) chunks)")
+    }
+    
+    private func handleMediaChunk(_ data: Data) {
+        do {
+            let chunkMessage = try JSONDecoder().decode(MediaChunkMessage.self, from: data)
+            
+            guard var mediaState = receivingMedia[chunkMessage.mediaId] else {
+                print("❌ Received chunk for unknown media: \(chunkMessage.mediaId)")
+                return
+            }
+            
+            // Decode chunk data
+            guard let chunkData = Data(base64Encoded: chunkMessage.chunkData) else {
+                print("❌ Failed to decode chunk data")
+                return
+            }
+            
+            // Store chunk
+            mediaState.receivedChunks[chunkMessage.chunkIndex] = chunkData
+            mediaState.receivedChunkCount += 1
+            receivingMedia[chunkMessage.mediaId] = mediaState
+            
+            print("📥 Received chunk \(chunkMessage.chunkIndex + 1)/\(chunkMessage.totalChunks)")
+            
+            // Check if all chunks received
+            if mediaState.isComplete {
+                assembleAndSaveReceivedMedia(mediaId: chunkMessage.mediaId, mediaState: mediaState)
+            }
+            
+        } catch {
+            print("❌ Failed to process media chunk: \(error)")
+        }
+    }
+    
+    private func assembleAndSaveReceivedMedia(mediaId: String, mediaState: MediaReceiveState) {
+        print("🔧 Assembling media file: \(mediaState.fileName)")
+        
+        // Assemble chunks in order
+        var completeData = Data()
+        for chunkIndex in 0..<mediaState.totalChunks {
+            if let chunkData = mediaState.receivedChunks[chunkIndex] {
+                completeData.append(chunkData)
+            } else {
+                print("❌ Missing chunk \(chunkIndex) for \(mediaState.fileName)")
+                return
+            }
+        }
+        
+        // Save to temporary location
+        do {
+            let localURL = try saveMediaFileLocally(data: completeData, fileName: mediaState.fileName)
+            
+            // Create message for received media
+            let mediaMessage = ChatMessage(
+                id: UUID().uuidString,
+                content: mediaState.fileName,
+                type: getMessageType(for: mediaState.mimeType),
+                isFromCurrentUser: false,
+                timestamp: Date(),
+                senderId: "peer", // We could track actual sender ID
+                status: .delivered,
+                mediaURL: localURL,
+                fileName: mediaState.fileName,
+                fileSize: mediaState.totalSize
+            )
+            
+            DispatchQueue.main.async {
+                self.messages.append(mediaMessage)
+            }
+            
+            print("✅ Received media file assembled: \(mediaState.fileName)")
+            
+            // Clean up
+            receivingMedia.removeValue(forKey: mediaId)
+            
+        } catch {
+            print("❌ Failed to save received media: \(error)")
+        }
+    }
+    
+    private func getMessageType(for mimeType: String) -> MessageType {
+        if mimeType.starts(with: "image/") {
+            return .image
+        } else if mimeType.starts(with: "video/") {
+            return .video
+        } else if mimeType.starts(with: "audio/") {
+            return .audio
+        } else {
+            return .file
+        }
+    }
+    
+    // MARK: - Cleanup
+    
+    func cleanupTempMediaFiles() {
+        let tempDir = createTempMediaDirectory()
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
+            for file in files {
+                try FileManager.default.removeItem(at: file)
+                print("🧹 Cleaned up temp file: \(file.lastPathComponent)")
+            }
+        } catch {
+            print("❌ Failed to cleanup temp files: \(error)")
+        }
     }
 }
 
@@ -1174,6 +1499,16 @@ struct WebSocketMessage: Codable {
         self.fileName = fileName
         self.fileSize = fileSize
     }
+}
+
+struct MediaChunkMessage: Codable {
+    let type: String
+    let clientId: String
+    let roomId: String
+    let mediaId: String
+    let chunkIndex: Int
+    let totalChunks: Int
+    let chunkData: String // Base64 encoded
 }
 
 // MARK: - Supporting Types
